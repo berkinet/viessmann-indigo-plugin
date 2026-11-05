@@ -1,5 +1,9 @@
 <?xml version='1.0' encoding='utf-8'?>
 <Actions>
+  <Action id="requestStatus" deviceFilter="self">
+    <Name>Request status</Name>
+    <CallbackMethod>requestStatus</CallbackMethod>
+  </Action>
   <Action id="selectRoomTarget" deviceFilter="self.viessmannHeater">
     <Name>Select room target to display/edit</Name>
     <CallbackMethod>selectRoomTarget</CallbackMethod>

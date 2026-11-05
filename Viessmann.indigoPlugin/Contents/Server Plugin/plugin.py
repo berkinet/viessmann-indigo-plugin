@@ -48,6 +48,15 @@ class Plugin(indigo.PluginBase):
         dev.replacePluginPropsOnServer(props)
         self.events.put(('start', dev.id))
 
+    def requestStatus(self, action, dev):
+        self.events.put(('refresh', dev.id))
+
+    def requestSystemStatus(self):
+        if self.system_id is None:
+            self.logger.warning('No active Viessmann system device')
+            return
+        self.events.put(('refresh', self.system_id))
+
     def actionControlUniversal(self, action, dev):
         if action.deviceAction == indigo.kUniversalAction.RequestStatus:
             self.events.put(('refresh', dev.id))

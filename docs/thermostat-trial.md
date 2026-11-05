@@ -32,6 +32,13 @@ Real vcontrold plus vsim successfully polled all six prototype values and accept
 
 The owner installed 0.2.1 from GitHub, recreated the two child devices, and confirmed that both thermostat roles and readback-confirmed setpoint changes work against the simulator. The system device was retained. The screenshot shows measured room temperature separately from the selected standard target and actionStatus=Simulator readback confirmed.
 
-Version 0.2.2 enables Indigo's Send Status Request capability on all three device types, including migration of existing saved properties. The universal action callback queues a refresh in the shared worker, never a second connection or a write. Either child's request refreshes the same shared snapshot as the system button. Repeated queued requests coalesce. A manual request is permitted with automatic polling disabled but does not enable periodic polling; its validity remains until a subsequent attempt or configuration/lifecycle transition, with timestamps showing age. Changed/stopped parent configurations cannot retain a pending one-shot request.
+Version 0.2.2 enables Indigo's Send Status Request capability on all three device types, including migration of existing saved properties. The universal action callback queues a refresh in the shared worker, never a second connection or a write. Either child's request refreshes the same shared snapshot as a system request. Repeated queued requests coalesce. A manual request is permitted with automatic polling disabled but does not enable periodic polling; its validity remains until a subsequent attempt or configuration/lifecycle transition, with timestamps showing age. Changed/stopped parent configurations cannot retain a pending one-shot request.
 
 Targeted tests cover callback routing, coalescing, disabled one-shot operation and enabled-to-disabled invalidation. The real vcontrold/vsim endpoint also completed one shot with automatic polling disabled, without resetting the owner's synthetic setpoints. The 0.2.2 build awaits the owner's GitHub installation; no local installation was performed.
+
+
+## 0.2.3: accessible system refresh
+
+The owner confirmed that the custom system device does not show a Send Status Request button, even when recreated. The 0.2.2 capability flag did not provide that UI; the earlier implication that it would was incorrect. Thermostat children retain their native buttons.
+
+Version 0.2.3 adds Plugins > Viessmann > Request system status, plus a device action named Request status for all three device types. Both use the existing serialized shared refresh path, including one-shot reads while periodic polling is disabled. The device action can also be assigned to a Control Page button. No device recreation is needed. Installation remains owner-managed through GitHub.
