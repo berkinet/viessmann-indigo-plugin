@@ -16,6 +16,11 @@ class Plugin(indigo.PluginBase):
         self.unavailable = {}
 
     def deviceStartComm(self, dev):
+        # Migrate existing devices too; a new XML default alone does not update saved props.
+        if dev.pluginProps.get('SupportsStatusRequest') is not True:
+            props = dict(dev.pluginProps)
+            props['SupportsStatusRequest'] = True
+            dev.replacePluginPropsOnServer(props)
         dev.stateListOrDisplayStateIdChanged()
         self.events.put(('start', dev.id))
 
@@ -42,6 +47,10 @@ class Plugin(indigo.PluginBase):
         props['roomTarget'] = target
         dev.replacePluginPropsOnServer(props)
         self.events.put(('start', dev.id))
+
+    def actionControlUniversal(self, action, dev):
+        if action.deviceAction == indigo.kUniversalAction.RequestStatus:
+            self.events.put(('refresh', dev.id))
 
     def actionControlThermostat(self, action, dev):
         kinds = {indigo.kThermostatAction.SetHeatSetpoint: 'set',
@@ -199,6 +208,13 @@ class Plugin(indigo.PluginBase):
                 action, device_id = self.events.get_nowait()
             except queue.Empty:
                 break
+            if action == 'refresh':
+                self._configure()
+                dev = self._device(device_id)
+                if (dev is not None and device_id in self.active and self.manager.settings is not None
+                        and (device_id == self.system_id or str(dev.pluginProps.get('systemId', '')) == str(self.system_id))):
+                    self.manager.request_poll()
+                continue
             if action == 'write':
                 # Re-read current endpoint/target before executing queued controls.
                 self._configure()
@@ -262,11 +278,12 @@ class Plugin(indigo.PluginBase):
                 for dev in devices:
                     self._unavailable(dev, 'Invalid selected room target')
                 return
+        changed = settings != self.manager.settings
         self.manager.configure(settings)
         for dev in devices:
             if dev.id != system.id and str(dev.pluginProps.get('systemId', '')) != str(system.id):
                 self._unavailable(dev, 'Parent system unavailable')
-            elif not settings.enabled:
+            elif not settings.enabled and (changed or self.unavailable.get(dev.id) in ('Awaiting polling', 'System restarting')):
                 self._unavailable(dev, 'Polling disabled')
 
     def runConcurrentThread(self):

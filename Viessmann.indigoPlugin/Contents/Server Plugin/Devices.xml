@@ -22,6 +22,7 @@
         <Label>Polling:</Label>
         <Description>Enable when ready to read the heater. No boiler writes.</Description>
       </Field>
+      <Field id="SupportsStatusRequest" type="checkbox" defaultValue="true" hidden="true" />
     </ConfigUI>
     <States>
       <State id="dataValid">
@@ -117,6 +118,7 @@
       <Field id="thermostatHelp" type="label">
         <Label>Native setpoint controls work only with the marked simulator. Real boiler writes are disabled. Selecting a target does not activate party mode or change the boiler program.</Label>
       </Field>
+      <Field id="SupportsStatusRequest" type="checkbox" defaultValue="true" hidden="true" />
     </ConfigUI>
     <States>
       <State id="dataValid">
@@ -194,6 +196,7 @@
       <Field id="thermostatHelp" type="label">
         <Label>Native setpoint controls work only with the marked simulator. Real boiler writes are disabled. Selecting a target does not activate party mode or change the boiler program.</Label>
       </Field>
+      <Field id="SupportsStatusRequest" type="checkbox" defaultValue="true" hidden="true" />
     </ConfigUI>
     <States>
       <State id="dataValid">

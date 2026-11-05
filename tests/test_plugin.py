@@ -184,6 +184,24 @@ class SchedulingTests(unittest.TestCase):
         self.assertTrue(instances[-1].closed)
 
 
+    def test_manual_poll_coalesces_without_enabling_periodic_polling(self):
+        calls = []
+        class Fake:
+            def __init__(self, settings): pass
+            def poll(self, cancelled): calls.append(1); return Result()
+            def disconnect(self): pass
+        manager = Manager(clock=lambda: 100, client_factory=Fake)
+        manager.configure(Settings('localhost', enabled=False))
+        manager.request_poll(); manager.request_poll()
+        self.assertIsNotNone(manager.tick())
+        self.assertEqual(len(calls), 1)
+        self.assertIsNone(manager.tick())
+        self.assertFalse(manager.settings.enabled)
+        manager.request_poll()
+        manager.configure(Settings('other-host', enabled=False))
+        self.assertIsNone(manager.tick())
+
+
 # Minimal Indigo surface: verify value distribution and stale-data behavior offline.
 class Device:
     def __init__(self, ident, kind, props):
@@ -206,6 +224,7 @@ class AdapterTests(unittest.TestCase):
         class Base:
             def __init__(self, ident, *args): self.pluginId = ident
         stub.PluginBase = Base; stub.Dict = dict; stub.devices = Devices()
+        stub.kUniversalAction = types.SimpleNamespace(RequestStatus=1)
         stub.kThermostatAction = types.SimpleNamespace(SetHeatSetpoint=1, IncreaseHeatSetpoint=2, DecreaseHeatSetpoint=3)
         self.previous = sys.modules.get('indigo'); sys.modules['indigo'] = stub
         spec = importlib.util.spec_from_file_location('plugin_under_test',
@@ -227,6 +246,8 @@ class AdapterTests(unittest.TestCase):
         else: sys.modules['indigo'] = self.previous
 
     def test_distribution_partial_failure_and_disabled_invalidates(self):
+        self.devices[1].pluginProps['pollingEnabled'] = True
+        self.plugin._configure()
         self.plugin._publish(Result(dict(zip(READS, (25, -3, 19, 30))), tcp_available=True))
         self.assertEqual(self.devices[2].states['roomSetpoint'], 19)
         self.assertNotIn('roomTemp', self.devices[2].states)
@@ -238,6 +259,7 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(self.devices[3].states['warmWaterTemp'], 30)
         self.assertFalse(self.devices[3].states['warmWaterTempValid'])
         self.assertEqual(self.devices[3].states['lastSuccess'], last)
+        self.devices[1].pluginProps['pollingEnabled'] = False
         self.plugin._configure()
         self.assertTrue(all(not d.states['dataValid'] for d in self.devices.values()))
 
@@ -293,6 +315,21 @@ class AdapterTests(unittest.TestCase):
         self.plugin._process_events()
         self.assertEqual(self.plugin.manager.due, 0)
         self.assertTrue(dev.pluginProps['SupportsHeatSetpoint'])
+
+    def test_status_request_routes_shared_one_shot_and_retains_disabled_snapshot(self):
+        self.plugin.actionControlUniversal(types.SimpleNamespace(deviceAction=1), self.devices[1])
+        self.plugin.actionControlUniversal(types.SimpleNamespace(deviceAction=1), self.devices[3])
+        self.plugin._process_events()
+        self.assertTrue(self.plugin.manager.requested)
+        self.assertFalse(self.plugin.manager.settings.enabled)
+        self.assertTrue(self.devices[1].pluginProps['SupportsStatusRequest'])
+        self.plugin._publish(Result(values=dict(zip(READS, (66, -3, 20, 46))), tcp_available=True))
+        self.plugin._configure()
+        self.assertTrue(self.devices[1].states['dataValid'])
+        self.plugin.deviceStopComm(self.devices[1]); self.plugin._process_events()
+        self.plugin.actionControlUniversal(types.SimpleNamespace(deviceAction=1), self.devices[3])
+        self.plugin._process_events()
+        self.assertFalse(self.plugin.manager.requested)
 
     def test_parent_stop_and_invalid_properties_fail_closed(self):
         self.devices[1].pluginProps['pollingEnabled'] = True

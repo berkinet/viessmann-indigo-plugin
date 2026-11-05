@@ -186,6 +186,7 @@ class Manager:
         self.settings = None
         self.client = None
         self.due = 0
+        self.requested = False
 
     def configure(self, settings):
         if settings != self.settings:
@@ -193,12 +194,17 @@ class Manager:
             self.settings = settings
             self.due = self.clock()
 
+    def request_poll(self):
+        # Called only by the worker; repeated queued refresh requests coalesce.
+        self.requested = True
+
     def tick(self, cancelled=lambda: False):
-        if (self.settings is None or not self.settings.enabled or cancelled()
-                or self.clock() < self.due):
+        if (self.settings is None or cancelled()
+                or (not self.requested and (not self.settings.enabled or self.clock() < self.due))):
             return None
         if self.client is None:
             self.client = self.client_factory(self.settings)
+        self.requested = False
         result = self.client.poll(cancelled)
         # No overlapping cycles or catch-up burst if a cycle takes longer than expected.
         self.due = self.clock() + self.settings.interval
@@ -214,6 +220,7 @@ class Manager:
         return actual
 
     def close(self):
+        self.requested = False
         if self.client is not None:
             self.client.disconnect()
         self.client = None
