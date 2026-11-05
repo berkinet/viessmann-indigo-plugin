@@ -1,0 +1,20 @@
+[Unit]
+Description=Viessmann synthetic Optolink simulator (TEST ONLY)
+After=network.target
+
+[Service]
+Type=simple
+User=rdp
+ExecStart=/home/rdp/viessmann/simulator/build/vsim
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=true
+PrivateDevices=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+IPAddressDeny=any
+IPAddressAllow=localhost
+
+[Install]
+WantedBy=multi-user.target

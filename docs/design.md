@@ -107,3 +107,9 @@ Keep unsupported controls absent or explicitly unavailable rather than simulatin
 The owner confirms the legacy read-only script ran every three minutes. Polling is a system-device property in seconds, default 180. Use a persistent TCP connection and explicitly release Optolink using close after each cycle, retaining TCP for reuse and possible future protocol extensions. Current upstream source is request/response; no change subscriptions were found. Future push notifications require explicit framing and routing, not numeric extraction from arbitrary incoming text.
 
 See runtime.md for initial read-only implementation scope, per-reading validity, lifecycle, timeout behavior and offline verification. Functional devices remain custom read-only devices until native thermostat semantics and writable controls can be supported accurately.
+
+## Selected room-target presentation
+
+The owner proposes that the native thermostat's single setpoint represent whichever room target is selected through configuration or actions. Normal and standard are confirmed synonyms; the targets are standard/normal, reduced and party. Switching the selected target must change the displayed value, label/context, and eventual write destination together. Keep the chosen editing target distinct from measured temperature and boiler operating program. Whether target selection should also activate a controller mode remains to be agreed; no such side effect is implemented. Native thermostat conversion and write support have not yet been implemented.
+
+An isolated vsim plus real-vcontrold environment is now installed; see simulator.md. Synthetic successful responses validate software plumbing only.

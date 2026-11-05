@@ -1,0 +1,23 @@
+[Unit]
+Description=Viessmann TEST vcontrold using synthetic simulator, no physical heater
+Requires=vcontrold-simulator.service
+After=vcontrold-simulator.service
+
+[Service]
+Type=simple
+User=rdp
+WorkingDirectory=/home/rdp/viessmann/simulator
+ExecStart=/usr/local/sbin/vcontrold -n -x /home/rdp/viessmann/simulator/config/vcontrold.xml -d 127.0.0.1:6578 -p 3003 -L 127.0.0.1 -l /home/rdp/viessmann/simulator/vcontrold-test.log -P /home/rdp/viessmann/simulator/vcontrold-test.pid
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=true
+PrivateDevices=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/rdp/viessmann/simulator
+IPAddressDeny=any
+IPAddressAllow=localhost
+
+[Install]
+WantedBy=multi-user.target

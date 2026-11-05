@@ -7,6 +7,7 @@ The initial implementation provides three logical custom devices: **Viessmann sy
 No boiler write controls are implemented. The heater is currently out of service, so successful controller readings remain unverified. The owner confirmed that 0.1.0 starts in Indigo; 0.1.1 fixes its empty configuration dialog and awaits an owner UI check.
 
 - [Setup, behavior, limitations and tests](docs/runtime.md)
+- [Isolated simulator for UI/configuration testing](docs/simulator.md)
 - [Design context](docs/design.md)
 - [OpenV support-gap comparison](docs/openv-support-gaps.md)
 - [Other home automation integrations](docs/integration-survey.md)
