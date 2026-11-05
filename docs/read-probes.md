@@ -37,3 +37,11 @@ For rollback to the pre-probe content, first copy the unchanged vito.xml-bak int
 ## Owner consolidated saved versions
 
 The owner moved saved XML versions into `/etc/vcontrold/xml`. Read-only verification found `revtest.xml`, `vito.xml-1`, `vito.xml-2053`, `vito.xml-bak`, and `vito.xml.sav` there. The current pre-probe backup path is therefore **/etc/vcontrold/xml/vito.xml-bak**, superseding earlier rollback path references. The active symlink still resolves to xml/revtest.xml, its SHA-256 is unchanged, and the selected XML parses successfully. No daemon reload was needed or performed for moving inactive saved versions.
+
+## Separate daemon configuration directory
+
+At the owner's request, daemon configurations were moved to `/etc/vcontrold/daemon-config/`: active `vcontrold.xml`, plus inactive `vcontrol.20cF`, `vcontrold.alt`, and `vcontrold.xml.sav`. `/etc/vcontrold/vcontrold.xml` now points to `daemon-config/vcontrold.xml`. These are separate from the command-definition versions in xml/.
+
+To preserve relative XInclude resolution without editing any XML, `daemon-config/vito.xml` points to `../vito.xml`, which still selects `xml/revtest.xml`. All moved file hashes, ownership and permissions were preserved. The inactive malformed vcontrold.alt was archived as-is, not selected or repaired. The service startup script remains in place.
+
+Metadata-only reload and a fresh-session command-catalogue check passed after relocation; all nine probes remained registered. No heater reads or writes were sent.
