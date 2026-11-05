@@ -45,3 +45,9 @@ At the owner's request, daemon configurations were moved to `/etc/vcontrold/daem
 To preserve relative XInclude resolution without editing any XML, `daemon-config/vito.xml` points to `../vito.xml`, which still selects `xml/revtest.xml`. All moved file hashes, ownership and permissions were preserved. The inactive malformed vcontrold.alt was archived as-is, not selected or repaired. The service startup script remains in place.
 
 Metadata-only reload and a fresh-session command-catalogue check passed after relocation; all nine probes remained registered. No heater reads or writes were sent.
+
+## Archived inactive research/test artifacts
+
+At the owner's request, addr1, addr2, code-check.out, command-list, and test-results were moved into /etc/vcontrold/archive/research/; test-xml.sh was moved into archive/scripts/. File contents, ownership and permission bits were verified unchanged. Both active symlinks and their selected configuration hashes were unchanged. No scripts were executed and no service reload was needed or performed.
+
+The /etc/vcontrold top level now contains only archive/, daemon-config/, xml/, and the active vito.xml and vcontrold.xml symlinks. Historical successful read output is preserved in archive/research/test-results for later investigation; it is not current telemetry.
