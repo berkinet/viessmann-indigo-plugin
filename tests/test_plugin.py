@@ -230,5 +230,18 @@ class AdapterTests(unittest.TestCase):
             {'host': 'localhost', 'pollInterval': '0'}, 'viessmannSystem', 1)[0])
 
 
+class BundleTests(unittest.TestCase):
+    def test_indigo_dialogs_have_fields(self):
+        # Indigo rejects otherwise well-formed XML dialogs with no Field elements.
+        import xml.etree.ElementTree as ET
+        server = ROOT / 'Viessmann.indigoPlugin/Contents/Server Plugin'
+        config = ET.parse(server / 'PluginConfig.xml').getroot()
+        self.assertTrue(config.findall('Field'), 'Plugin configuration dialog is empty')
+        devices = ET.parse(server / 'Devices.xml').getroot()
+        for device in devices.findall('Device'):
+            with self.subTest(device=device.get('id')):
+                self.assertTrue(device.findall('./ConfigUI/Field'), 'Device configuration dialog is empty')
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -1,8 +1,8 @@
-# Initial read-only plugin (0.1.0 development build)
+# Initial read-only plugin (0.1.1 development build)
 
 ## Setup and scope
 
-The source bundle is Viessmann.indigoPlugin. It targets Indigo's Python 3 Server API 3.9, following the installed Indigo plugin bundle conventions. No third-party Python packages are required. It has not yet been installed or loaded in a live Indigo plugin process.
+The source bundle is Viessmann.indigoPlugin. It targets Indigo's Python 3 Server API 3.9, following the installed Indigo plugin bundle conventions. No third-party Python packages are required. The owner installed 0.1.0 and confirmed it starts in Indigo. That build produced an empty plugin-configuration dialog error. Version 0.1.1 adds a configuration-help field and a bundle validation guard; its dialog still needs a live UI check.
 
 When ready for an Indigo smoke test, install the bundle through Indigo, then create one Viessmann system device. Enter the Pi hostname/IP and TCP port (default 3002). Polling is disabled by default; leave it disabled while the heater is out of service. Create Viessmann heater and Viessmann water heater devices and select the same system as their parent. They are custom read-only devices, not native thermostats yet.
 
@@ -49,4 +49,8 @@ Build a clean installer archive with `python3 tools/package.py` (output under di
 
 Tests use a local synthetic TCP server and a minimal Indigo API double. They cover persistent connection reuse, successful/failed release, fragmented responses, zero/negative readings, diagnostics, timeout recovery, read-only dispatch, cancellation, polling cadence/configuration, child distribution, and invalidation. They do not establish real-controller compatibility or live Indigo loading.
 
-No code was installed into the operational Indigo installation, no schedule was enabled, and no further Pi/controller reads were required for this implementation.
+The owner installed the initial bundle; the agent has not modified the installed copy or enabled polling/schedules. No further Pi/controller reads were required for these changes.
+
+## 0.1.1 correction
+
+Indigo requires at least one Field in a configuration dialog, beyond XML well-formedness. The plugin-level dialog now explains that connection and polling settings live on the system device. An offline bundle regression check and packaging guard enforce this requirement. No communications behavior changed.
