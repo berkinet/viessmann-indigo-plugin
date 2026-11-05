@@ -8,6 +8,11 @@ import time
 # Existing script mappings, checked against the deployed XML; live validation pending.
 READS = {'boilerTemp': 'getBoilerTemp', 'outsideTemp': 'getOutsideTemp',
          'roomSetpoint': 'getRoomTempSP', 'warmWaterTemp': 'getWaterTemp'}
+TARGETS = {'standard': ('getRoomTempSP', 'setTempRaumNorSollM1'),
+           'reduced': ('getTempRaumRedSollM1', 'setTempRaumRedSollM1'),
+           'party': ('getTempPartyM1', 'setTempPartyM1'),
+           'dhw': ('getTempWWsoll', 'setTempWWsoll')}
+SIMULATOR_ID = 'SIMULATOR_209F (ID=209F) (Protocol=KW2)'
 TEMPERATURE = re.compile(r'([+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+))(?:[ \t]*(?:°?C))?')
 
 
@@ -28,8 +33,11 @@ class Settings:
     interval: int = 180
     timeout: int = 12
     enabled: bool = False
+    target: str = "standard"
 
     def __post_init__(self):
+        if self.target not in ('standard', 'reduced', 'party'):
+            raise ValueError('Invalid room target')
         if not self.host or any(c.isspace() for c in self.host):
             raise ValueError('A hostname or IP address is required')
         for value, low, high in ((self.port, 1, 65535), (self.interval, 30, 86400),
@@ -44,6 +52,7 @@ class Result:
     errors: dict = field(default_factory=dict)
     tcp_available: bool = False
     release_error: str = ''
+    simulator: bool = False
 
 
 class Client:
@@ -82,7 +91,8 @@ class Client:
         return frame.decode('ascii').strip()
 
     def _exchange(self, command, cancelled):
-        if command not in (*READS.values(), 'close'):
+        allowed = set(READS.values()) | {v[0] for v in TARGETS.values()} | {'getProbeRoomTemp', 'device', 'close'}
+        if command not in allowed:
             raise ValueError('Command is not an allowed read or link release')
         self.sock.settimeout(self.settings.timeout)
         self.sock.sendall((command + '\n').encode('ascii'))
@@ -97,7 +107,16 @@ class Client:
                 self._frame(cancelled)
             result.tcp_available = True
             try:
-                for key, command in READS.items():
+                try:
+                    result.simulator = self._exchange('device', cancelled) == SIMULATOR_ID
+                except (OSError, ValueError, UnicodeError):
+                    self.disconnect()
+                    raise
+                reads = dict(READS)
+                reads['roomSetpoint'] = TARGETS[self.settings.target][0]
+                if result.simulator:
+                    reads.update(roomMeasuredTemp='getProbeRoomTemp', dhwSetpoint='getTempWWsoll')
+                for key, command in reads.items():
                     try:
                         response = self._exchange(command, cancelled)
                     except (OSError, ValueError, UnicodeError):
@@ -125,6 +144,40 @@ class Client:
         return result
 
 
+    def write_simulated(self, target, value, cancelled=lambda: False):
+        """No physical writes: fresh identity check, bounded setter, then real readback."""
+        if target not in TARGETS:
+            raise ValueError('Unknown target')
+        number = float(value)
+        low, high = (10, 60) if target == 'dhw' else (3, 37)
+        if not math.isfinite(number) or not number.is_integer() or not low <= number <= high:
+            raise ValueError('Simulator target must be a whole degree from %s to %s' % (low, high))
+        try:
+            if self.sock is None:
+                self.sock = socket.create_connection((self.settings.host, self.settings.port), min(5, self.settings.timeout))
+                self._frame(cancelled)
+            # Check on this exact connection immediately before the one permitted write.
+            if self._exchange('device', cancelled) != SIMULATOR_ID:
+                raise PermissionError('Setpoint writes are enabled only on the marked simulator')
+            if cancelled():
+                raise InterruptedError('Cancelled before write')
+            read, setter = TARGETS[target]
+            self.sock.settimeout(self.settings.timeout)
+            self.sock.sendall(('%s %d\n' % (setter, number)).encode('ascii'))
+            if self._frame(cancelled) != 'OK':
+                raise ValueError('Setter did not return OK; result uncertain, not retried')
+            actual = temperature(self._exchange(read, cancelled))
+            if actual != number:
+                raise ValueError('Setpoint readback mismatch')
+            response = self._exchange('close', cancelled)
+            if not response.endswith(' closed') or 'ERR:' in response:
+                raise ValueError('Optolink release failed after write')
+            return actual
+        except (OSError, ValueError, UnicodeError):
+            self.disconnect()
+            raise
+
+
 class Manager:
     """One physical system and one serialized command stream for all child devices."""
     def __init__(self, clock=time.monotonic, client_factory=Client):
@@ -150,6 +203,15 @@ class Manager:
         # No overlapping cycles or catch-up burst if a cycle takes longer than expected.
         self.due = self.clock() + self.settings.interval
         return result
+
+    def write_simulated(self, target, value, cancelled=lambda: False):
+        if self.settings is None or not self.settings.enabled:
+            raise PermissionError('Polling must be enabled to use simulator controls')
+        if self.client is None:
+            self.client = self.client_factory(self.settings)
+        actual = self.client.write_simulated(target, value, cancelled)
+        self.due = self.clock()
+        return actual
 
     def close(self):
         if self.client is not None:

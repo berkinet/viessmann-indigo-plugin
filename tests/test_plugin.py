@@ -23,6 +23,7 @@ class FixtureServer(socketserver.ThreadingTCPServer):
         self.answers = answers or ['27.4 C', '0 C', '19.0', '-2.5 C']
         self.stall = stall
         self.close_reply = close_reply
+        self.identity = "V200KO2B (ID=209F) (Protocol=KW2)"
         owner = self
 
         class Handler(socketserver.StreamRequestHandler):
@@ -41,7 +42,9 @@ class FixtureServer(socketserver.ThreadingTCPServer):
                         if owner.stall:
                             time.sleep(1.2)
                             return
-                        if command == 'close':
+                        if command == 'device':
+                            reply = owner.identity + '\nvctrld> '
+                        elif command == 'close':
                             reply = (owner.close_reply or '/dev/test closed') + '\nvctrld> '
                         else:
                             reply = owner.answers[list(READS.values()).index(command)] + '\nvctrld> '
@@ -72,7 +75,7 @@ class TransportTests(unittest.TestCase):
                 self.assertFalse(result.errors)
                 self.assertFalse(result.release_error)
             self.assertEqual(server.connections, 1)
-            self.assertEqual(server.commands, (list(READS.values()) + ['close']) * 2)
+            self.assertEqual(server.commands, (['device'] + list(READS.values()) + ['close']) * 2)
         finally:
             client.disconnect(); server.stop()
 
@@ -97,7 +100,7 @@ class TransportTests(unittest.TestCase):
             self.assertLess(time.monotonic() - start, 2)
             self.assertEqual(set(result.errors), set(READS))
             self.assertIsNone(client.sock)
-            self.assertEqual(server.commands, ['getBoilerTemp'])
+            self.assertEqual(server.commands, ['device'])
             server.stall = False
             self.assertEqual(len(client.poll().values), 4)
             self.assertEqual(server.connections, 2)
@@ -115,6 +118,21 @@ class TransportTests(unittest.TestCase):
             server.close_reply = None
             self.assertFalse(client.poll().release_error)
             self.assertEqual(server.connections, 2)
+        finally:
+            client.disconnect(); server.stop()
+
+    def test_physical_identity_blocks_writes(self):
+        server = FixtureServer()
+        client = Client(server.settings())
+        try:
+            with self.assertRaises(PermissionError):
+                client.write_simulated('standard', 21)
+            self.assertEqual(server.commands, ['device'])
+            self.assertIsNone(client.sock)
+            for target, value in [('standard', 38), ('standard', 20.5), ('dhw', 9), ('bogus', 20)]:
+                with self.subTest(target=target, value=value), self.assertRaises(ValueError):
+                    client.write_simulated(target, value)
+            self.assertEqual(server.commands, ['device'])
         finally:
             client.disconnect(); server.stop()
 
@@ -175,6 +193,7 @@ class Device:
         self.states.update({u['key']: u['value'] for u in updates})
     def setErrorStateOnServer(self, error): self.error = error
     def stateListOrDisplayStateIdChanged(self): pass
+    def replacePluginPropsOnServer(self, props): self.pluginProps = dict(props)
 
 
 class Devices(dict):
@@ -187,11 +206,14 @@ class AdapterTests(unittest.TestCase):
         class Base:
             def __init__(self, ident, *args): self.pluginId = ident
         stub.PluginBase = Base; stub.Dict = dict; stub.devices = Devices()
+        stub.kThermostatAction = types.SimpleNamespace(SetHeatSetpoint=1, IncreaseHeatSetpoint=2, DecreaseHeatSetpoint=3)
         self.previous = sys.modules.get('indigo'); sys.modules['indigo'] = stub
         spec = importlib.util.spec_from_file_location('plugin_under_test',
             ROOT / 'Viessmann.indigoPlugin/Contents/Server Plugin/plugin.py')
         module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
         self.plugin = module.Plugin('test', 'Test', '0', {})
+        import logging
+        self.plugin.logger = logging.getLogger('test')
         self.devices = stub.devices
         for d in (Device(1, 'viessmannSystem', {'host': 'localhost'}),
                   Device(2, 'viessmannHeater', {'systemId': '1'}),
@@ -218,6 +240,59 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(self.devices[3].states['lastSuccess'], last)
         self.plugin._configure()
         self.assertTrue(all(not d.states['dataValid'] for d in self.devices.values()))
+
+    def test_native_mapping_never_uses_setpoint_as_measured_temperature(self):
+        values = dict(zip(READS, (66, -3, 20, 46)))
+        values.update(roomMeasuredTemp=20.7, dhwSetpoint=50)
+        self.plugin._publish(Result(values=values, tcp_available=True, simulator=True))
+        heater, dhw = self.devices[2], self.devices[3]
+        self.assertEqual(heater.states['setpointHeat'], 20)
+        self.assertEqual(heater.states['temperatureInput1'], 20.7)
+        self.assertEqual(dhw.states['setpointHeat'], 50)
+        self.assertEqual(dhw.states['temperatureInput1'], 46)
+        self.assertTrue(heater.pluginProps['SupportsHeatSetpoint'])
+        self.assertFalse(heater.pluginProps['SupportsCoolSetpoint'])
+        self.assertFalse(heater.pluginProps['SupportsHvacOperationMode'])
+        self.devices[2].pluginProps['roomTarget'] = 'reduced'
+        self.plugin._configure()
+        self.assertEqual(self.plugin.manager.settings.target, 'reduced')
+        self.plugin._publish(Result(values=dict(zip(READS, (66, -3, 16, 46))), tcp_available=True))
+        self.assertFalse(heater.pluginProps['SupportsHeatSetpoint'])
+        self.assertEqual(heater.pluginProps['NumTemperatureInputs'], 0)
+
+    def test_queued_target_change_rejects_write_and_relative_actions_use_readback(self):
+        self.devices[1].pluginProps['pollingEnabled'] = True
+        self.plugin._configure()
+        values = dict(zip(READS, (66, -3, 20, 46)))
+        values.update(roomMeasuredTemp=20.7, dhwSetpoint=50)
+        self.plugin._publish(Result(values=values, tcp_available=True, simulator=True))
+        calls = []
+        def write(target, value, cancelled):
+            calls.append((target, value))
+            return value
+        self.plugin.manager.write_simulated = write
+        dev = self.devices[2]
+        self.plugin.actionControlThermostat(types.SimpleNamespace(thermostatAction=2, actionValue=1), dev)
+        self.plugin.actionControlThermostat(types.SimpleNamespace(thermostatAction=2, actionValue=1), dev)
+        self.plugin._process_events()
+        self.assertEqual(calls, [('standard', 21), ('standard', 22)])
+        self.plugin.actionControlThermostat(types.SimpleNamespace(thermostatAction=1, actionValue=25), dev)
+        dev.pluginProps['roomTarget'] = 'reduced'
+        self.plugin._process_events()
+        self.assertEqual(len(calls), 2)
+        self.assertIn('changed', dev.states['actionStatus'])
+
+    def test_capability_restart_preserves_ui_and_refreshes_immediately(self):
+        values = dict(zip(READS, (66, -3, 20, 46)))
+        values.update(roomMeasuredTemp=20.7, dhwSetpoint=50)
+        self.plugin._publish(Result(values=values, tcp_available=True, simulator=True))
+        dev = self.devices[2]
+        self.plugin.manager.due = 1000000000
+        self.plugin.deviceStartComm(dev)
+        self.assertTrue(dev.pluginProps['SupportsHeatSetpoint'])
+        self.plugin._process_events()
+        self.assertEqual(self.plugin.manager.due, 0)
+        self.assertTrue(dev.pluginProps['SupportsHeatSetpoint'])
 
     def test_parent_stop_and_invalid_properties_fail_closed(self):
         self.devices[1].pluginProps['pollingEnabled'] = True

@@ -62,3 +62,7 @@ The simulator-backed vcontrold-test.service now listens on **192.168.5.37:3002**
 Two direct polls from the Indigo Mac to 192.168.5.37:3002 returned the expected four synthetic values with no release errors. The owner switched the Indigo system device to the direct endpoint. The obsolete Mac SSH tunnel was stopped. The smoke-test helper now defaults to the direct Pi endpoint. No plugin binary update is required.
 
 Production main/command XML symlinks remain unchanged. Copies of the test unit/config before the port switch are retained beside those files with before-port-switch suffixes. To restore real hardware after repair: stop/disable vcontrold-test.service first to release 3002, then enable/start vcontrol.service. Stop/disable vsim too if no longer needed. Keep a SIMULATOR label on the Indigo device until that deliberate switch and real-read validation; the shared endpoint cannot itself distinguish simulated versus physical readings.
+
+## Native thermostat trial extension
+
+The simulator now has a distinct identity and four stateful target setters for UI testing. The earlier read-only-only description is superseded for the test environment by thermostat-trial.md. The actual heater XML remains unchanged. Test-daemon service now uses normal forked-client mode and its PIDFile so multiple clients can connect.

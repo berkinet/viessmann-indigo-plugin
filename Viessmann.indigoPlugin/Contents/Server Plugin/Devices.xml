@@ -84,15 +84,38 @@
         <TriggerLabel>Outside temperature last success (UTC)</TriggerLabel>
         <ControlPageLabel>Outside temperature last success (UTC)</ControlPageLabel>
       </State>
+      <State id="simulator">
+        <ValueType>Boolean</ValueType>
+        <TriggerLabel>Simulator endpoint</TriggerLabel>
+        <ControlPageLabel>Simulator endpoint</ControlPageLabel>
+      </State>
     </States>
     <UiDisplayStateId>status</UiDisplayStateId>
   </Device>
-  <Device id="viessmannHeater" type="custom">
+  <Device id="viessmannHeater" type="thermostat">
     <Name>Viessmann heater</Name>
     <ConfigUI>
       <Field id="systemId" type="menu">
         <Label>Viessmann system:</Label>
         <List class="self" method="getSystems" />
+      </Field>
+      <Field id="NumTemperatureInputs" type="textfield" defaultValue="0" hidden="true" />
+      <Field id="NumHumidityInputs" type="textfield" defaultValue="0" hidden="true" />
+      <Field id="SupportsHeatSetpoint" type="checkbox" defaultValue="false" hidden="true" />
+      <Field id="SupportsCoolSetpoint" type="checkbox" defaultValue="false" hidden="true" />
+      <Field id="SupportsHvacOperationMode" type="checkbox" defaultValue="false" hidden="true" />
+      <Field id="SupportsHvacFanMode" type="checkbox" defaultValue="false" hidden="true" />
+      <Field id="ShowCoolHeatEquipmentStateUI" type="checkbox" defaultValue="false" hidden="true" />
+      <Field id="roomTarget" type="menu" defaultValue="standard">
+        <Label>Room target to display/edit:</Label>
+        <List>
+          <Option value="standard">Standard / normal</Option>
+          <Option value="reduced">Reduced</Option>
+          <Option value="party">Party</Option>
+        </List>
+      </Field>
+      <Field id="thermostatHelp" type="label">
+        <Label>Native setpoint controls work only with the marked simulator. Real boiler writes are disabled. Selecting a target does not activate party mode or change the boiler program.</Label>
       </Field>
     </ConfigUI>
     <States>
@@ -136,15 +159,40 @@
         <TriggerLabel>Room setpoint last success (UTC)</TriggerLabel>
         <ControlPageLabel>Room setpoint last success (UTC)</ControlPageLabel>
       </State>
+      <State id="simulator">
+        <ValueType>Boolean</ValueType>
+        <TriggerLabel>Simulator endpoint</TriggerLabel>
+        <ControlPageLabel>Simulator endpoint</ControlPageLabel>
+      </State>
+      <State id="actionStatus">
+        <ValueType>String</ValueType>
+        <TriggerLabel>Last thermostat action</TriggerLabel>
+        <ControlPageLabel>Last thermostat action</ControlPageLabel>
+      </State>
+      <State id="selectedTarget">
+        <ValueType>String</ValueType>
+        <TriggerLabel>Selected room target</TriggerLabel>
+        <ControlPageLabel>Selected room target</ControlPageLabel>
+      </State>
     </States>
     <UiDisplayStateId>status</UiDisplayStateId>
   </Device>
-  <Device id="viessmannWaterHeater" type="custom">
+  <Device id="viessmannWaterHeater" type="thermostat">
     <Name>Viessmann water heater</Name>
     <ConfigUI>
       <Field id="systemId" type="menu">
         <Label>Viessmann system:</Label>
         <List class="self" method="getSystems" />
+      </Field>
+      <Field id="NumTemperatureInputs" type="textfield" defaultValue="1" hidden="true" />
+      <Field id="NumHumidityInputs" type="textfield" defaultValue="0" hidden="true" />
+      <Field id="SupportsHeatSetpoint" type="checkbox" defaultValue="false" hidden="true" />
+      <Field id="SupportsCoolSetpoint" type="checkbox" defaultValue="false" hidden="true" />
+      <Field id="SupportsHvacOperationMode" type="checkbox" defaultValue="false" hidden="true" />
+      <Field id="SupportsHvacFanMode" type="checkbox" defaultValue="false" hidden="true" />
+      <Field id="ShowCoolHeatEquipmentStateUI" type="checkbox" defaultValue="false" hidden="true" />
+      <Field id="thermostatHelp" type="label">
+        <Label>Native setpoint controls work only with the marked simulator. Real boiler writes are disabled. Selecting a target does not activate party mode or change the boiler program.</Label>
       </Field>
     </ConfigUI>
     <States>
@@ -187,6 +235,21 @@
         <ValueType>String</ValueType>
         <TriggerLabel>DHW temperature last success (UTC)</TriggerLabel>
         <ControlPageLabel>DHW temperature last success (UTC)</ControlPageLabel>
+      </State>
+      <State id="simulator">
+        <ValueType>Boolean</ValueType>
+        <TriggerLabel>Simulator endpoint</TriggerLabel>
+        <ControlPageLabel>Simulator endpoint</ControlPageLabel>
+      </State>
+      <State id="actionStatus">
+        <ValueType>String</ValueType>
+        <TriggerLabel>Last thermostat action</TriggerLabel>
+        <ControlPageLabel>Last thermostat action</ControlPageLabel>
+      </State>
+      <State id="dhwSetpoint">
+        <ValueType>Number</ValueType>
+        <TriggerLabel>DHW target (C)</TriggerLabel>
+        <ControlPageLabel>DHW target (C)</ControlPageLabel>
       </State>
     </States>
     <UiDisplayStateId>status</UiDisplayStateId>

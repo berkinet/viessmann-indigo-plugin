@@ -2,7 +2,7 @@ import queue
 import threading
 from datetime import datetime, timezone
 import indigo
-from comms import Manager, Settings
+from comms import Manager, Settings, TARGETS
 
 
 class Plugin(indigo.PluginBase):
@@ -21,6 +21,64 @@ class Plugin(indigo.PluginBase):
 
     def deviceStopComm(self, dev):
         self.events.put(('stop', dev.id))
+
+    def _native_capabilities(self, dev, simulator, writable):
+        props = dict(dev.pluginProps)
+        values = {'NumTemperatureInputs': 1 if simulator or dev.deviceTypeId == 'viessmannWaterHeater' else 0,
+                  'NumHumidityInputs': 0, 'SupportsHeatSetpoint': writable,
+                  'SupportsCoolSetpoint': False, 'SupportsHvacOperationMode': False,
+                  'SupportsHvacFanMode': False, 'ShowCoolHeatEquipmentStateUI': False}
+        if any(props.get(key) != value for key, value in values.items()):
+            props.update(values)
+            dev.replacePluginPropsOnServer(props)
+            dev.stateListOrDisplayStateIdChanged()
+
+    def selectRoomTarget(self, action, dev):
+        target = action.props.get('target', 'standard')
+        if target not in ('standard', 'reduced', 'party'):
+            self.logger.error('Invalid room target')
+            return
+        props = dict(dev.pluginProps)
+        props['roomTarget'] = target
+        dev.replacePluginPropsOnServer(props)
+        self.events.put(('start', dev.id))
+
+    def actionControlThermostat(self, action, dev):
+        kinds = {indigo.kThermostatAction.SetHeatSetpoint: 'set',
+                 indigo.kThermostatAction.IncreaseHeatSetpoint: 'increase',
+                 indigo.kThermostatAction.DecreaseHeatSetpoint: 'decrease'}
+        kind = kinds.get(action.thermostatAction)
+        if kind is None:
+            self.logger.error('Unsupported thermostat action')
+            return
+        target = dev.pluginProps.get('roomTarget', 'standard') if dev.deviceTypeId == 'viessmannHeater' else 'dhw'
+        self.events.put(('write', (dev.id, target, kind, action.actionValue, self.manager.settings)))
+
+    def _write(self, request):
+        device_id, target, kind, requested, original_settings = request
+        dev = self._device(device_id)
+        if dev is None or device_id not in self.active:
+            return
+        try:
+            if original_settings is None or original_settings != self.manager.settings:
+                raise ValueError('Configuration changed before action; retry explicitly')
+            current_target = dev.pluginProps.get('roomTarget', 'standard') if dev.deviceTypeId == 'viessmannHeater' else 'dhw'
+            if current_target != target or str(dev.pluginProps.get('systemId', '')) != str(self.system_id):
+                raise ValueError('Selected target or parent changed before action')
+            if not dev.states.get('dataValid', False) or not dev.states.get('simulator', False):
+                raise ValueError('A valid simulator reading is required before editing')
+            value = float(requested)
+            if kind != 'set':
+                base = float(dev.states['setpointHeat'])
+                value = base + value if kind == 'increase' else base - value
+            actual = self.manager.write_simulated(target, value, self.closing.is_set)
+            # Publish only confirmed readback; the following full cycle refreshes all states.
+            dev.updateStatesOnServer([{'key': 'setpointHeat', 'value': actual},
+                                      {'key': 'roomSetpoint' if target != 'dhw' else 'dhwSetpoint', 'value': actual},
+                                      {'key': 'actionStatus', 'value': 'Simulator readback confirmed'}])
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            dev.updateStatesOnServer([{'key': 'actionStatus', 'value': str(exc)}])
+            self.logger.warning('Thermostat action rejected/failed: %s', exc)
 
     def getSystems(self, filter='', valuesDict=None, typeId='', targetId=0):
         return [(str(d.id), d.name) for d in indigo.devices.iter(self.pluginId)
@@ -43,6 +101,8 @@ class Plugin(indigo.PluginBase):
                    for d in indigo.devices.iter(self.pluginId)):
                 errors['host'] = 'Use the existing system; this version supports one boiler.'
         else:
+            if typeId == 'viessmannHeater' and valuesDict.get('roomTarget', 'standard') not in ('standard', 'reduced', 'party'):
+                errors['roomTarget'] = 'Select standard, reduced or party.'
             try:
                 parent = indigo.devices[int(valuesDict.get('systemId', 0))]
                 if parent.pluginId != self.pluginId or parent.deviceTypeId != 'viessmannSystem':
@@ -85,13 +145,17 @@ class Plugin(indigo.PluginBase):
             self.unavailable.pop(dev.id, None)
             keys = self._keys(dev)
             valid = all(key in result.values for key in keys)
+            if result.simulator and dev.deviceTypeId == 'viessmannHeater':
+                valid = valid and 'roomMeasuredTemp' in result.values
+            if result.simulator and dev.deviceTypeId == 'viessmannWaterHeater':
+                valid = valid and 'dhwSetpoint' in result.values
             if dev.deviceTypeId == 'viessmannSystem':
                 valid = valid and not result.errors and not result.release_error
             errors = [key + ': ' + message for key, message in result.errors.items()
                       if dev.deviceTypeId == 'viessmannSystem' or key in keys]
             if result.release_error:
                 errors.append('Link release: ' + result.release_error)
-            updates = [{'key': 'lastAttempt', 'value': stamp},
+            updates = [{'key': 'simulator', 'value': result.simulator}, {'key': 'lastAttempt', 'value': stamp},
                        {'key': 'dataValid', 'value': valid},
                        {'key': 'status', 'value': 'Current' if valid else 'Read failed'},
                        {'key': 'lastError', 'value': '; '.join(errors)[:800]}]
@@ -104,6 +168,28 @@ class Plugin(indigo.PluginBase):
                                     {'key': key + 'Updated', 'value': stamp}])
             if valid:
                 updates.append({'key': 'lastSuccess', 'value': stamp})
+            if dev.deviceTypeId != 'viessmannSystem':
+                target = dev.pluginProps.get('roomTarget', 'standard')
+                target_key = 'roomSetpoint' if dev.deviceTypeId == 'viessmannHeater' else 'dhwSetpoint'
+                writable = result.simulator and valid and target_key in result.values
+                self._native_capabilities(dev, result.simulator, writable)
+                if dev.deviceTypeId == 'viessmannHeater':
+                    updates.append({'key': 'selectedTarget', 'value': target.title()})
+                    if result.simulator and 'roomMeasuredTemp' in result.values:
+                        updates.append({'key': 'temperatureInput1', 'value': result.values['roomMeasuredTemp']})
+                elif 'warmWaterTemp' in result.values:
+                    updates.append({'key': 'temperatureInput1', 'value': result.values['warmWaterTemp']})
+                if writable:
+                    updates.append({'key': 'setpointHeat', 'value': result.values[target_key]})
+                if target_key == 'dhwSetpoint' and target_key in result.values:
+                    updates.append({'key': 'dhwSetpoint', 'value': result.values[target_key]})
+            if result.simulator:
+                label = 'SIMULATOR'
+                if dev.deviceTypeId == 'viessmannHeater':
+                    label += ' · ' + dev.pluginProps.get('roomTarget', 'standard').title()
+                for update in updates:
+                    if update['key'] == 'status' and valid:
+                        update['value'] = label
             dev.updateStatesOnServer(updates)
             dev.setErrorStateOnServer(None if valid else 'Read failed')
 
@@ -113,9 +199,15 @@ class Plugin(indigo.PluginBase):
                 action, device_id = self.events.get_nowait()
             except queue.Empty:
                 break
+            if action == 'write':
+                # Re-read current endpoint/target before executing queued controls.
+                self._configure()
+                self._write(device_id)
+                continue
             dev = self._device(device_id)
             if action == 'start' and dev is not None:
                 self.active.add(device_id)
+                self.manager.due = 0
                 self.unavailable.pop(device_id, None)
                 self._unavailable(dev, 'Awaiting polling')
                 if dev.deviceTypeId == 'viessmannSystem':
@@ -153,6 +245,23 @@ class Plugin(indigo.PluginBase):
             for dev in devices:
                 self._unavailable(dev, 'Invalid system configuration')
             return
+        heaters = [d for d in devices if d.deviceTypeId == 'viessmannHeater' and str(d.pluginProps.get('systemId', '')) == str(system.id)]
+        if len(heaters) > 1:
+            self.manager.close()
+            self.manager.settings = None
+            for dev in devices:
+                self._unavailable(dev, 'Only one heater per system is supported')
+            return
+        if heaters:
+            from dataclasses import replace
+            try:
+                settings = replace(settings, target=heaters[0].pluginProps.get('roomTarget', 'standard'))
+            except ValueError:
+                self.manager.close()
+                self.manager.settings = None
+                for dev in devices:
+                    self._unavailable(dev, 'Invalid selected room target')
+                return
         self.manager.configure(settings)
         for dev in devices:
             if dev.id != system.id and str(dev.pluginProps.get('systemId', '')) != str(system.id):

@@ -1,3 +1,7 @@
+# Runtime reference
+
+For the current native thermostat prototype see [thermostat-trial.md](thermostat-trial.md). The following describes the earlier read-only 0.1.x baseline; its statements about custom children and no simulator setters are historical.
+
 # Initial read-only plugin (0.1.1 development build)
 
 ## Setup and scope

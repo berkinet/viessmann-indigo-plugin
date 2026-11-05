@@ -1,1 +1,17 @@
-<Actions/>
+<?xml version='1.0' encoding='utf-8'?>
+<Actions>
+  <Action id="selectRoomTarget" deviceFilter="self.viessmannHeater">
+    <Name>Select room target to display/edit</Name>
+    <CallbackMethod>selectRoomTarget</CallbackMethod>
+    <ConfigUI>
+      <Field id="target" type="menu" defaultValue="standard">
+        <Label>Room target:</Label>
+        <List>
+          <Option value="standard">Standard / normal</Option>
+          <Option value="reduced">Reduced</Option>
+          <Option value="party">Party</Option>
+        </List>
+      </Field>
+    </ConfigUI>
+  </Action>
+</Actions>

@@ -10,9 +10,9 @@ client = Client(Settings(host, port=port, enabled=True))
 try:
     for cycle in range(2):
         result = client.poll()
-        assert result.values == {'boilerTemp': 66.0, 'outsideTemp': -3.0,
+        assert {key: result.values[key] for key in ('boilerTemp', 'outsideTemp', 'roomSetpoint', 'warmWaterTemp')} == {'boilerTemp': 66.0, 'outsideTemp': -3.0,
                                  'roomSetpoint': 20.0, 'warmWaterTemp': 46.0}, result
-        assert not result.errors and not result.release_error, result
+        assert not result.errors and not result.release_error and result.simulator, result
         print('SYNTHETIC cycle', cycle + 1, result.values)
 finally:
     client.disconnect()

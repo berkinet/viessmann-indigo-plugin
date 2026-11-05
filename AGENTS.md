@@ -35,3 +35,7 @@ The later iOS screenshot shows five program choices, including Continuous reduce
 The owner emphasizes limited accessible functions/controls. Do not aim for Vitodata/iOS parity or expose controls solely because the app/manual/XML lists them. Scope implementation to verified accessible capabilities; the five app programs are reference candidates, not promised support.
 
 Implementation baseline: persistent TCP owned by one manager; close releases Optolink between cycles without closing TCP. Poll interval defaults to 180 seconds on the system device. Polling starts disabled; do not enable live polling while the heater is out of service. See docs/runtime.md.
+
+## Distribution and thermostat trial
+
+The owner downloads installers from GitHub and performs installation. Publish versioned release assets; do not initiate local Indigo upgrades unless explicitly asked. Current prototype uses native thermostat children with selectable standard/normal, reduced, and party room targets. See docs/thermostat-trial.md. Physical writes remain blocked. Only the positively marked simulator may accept bounded setpoint commands with acknowledgement and readback; the marker must never be added to physical-controller configuration. Preserve the system device and its settings when migrating child classes.
