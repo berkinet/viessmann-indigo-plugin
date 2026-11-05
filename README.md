@@ -9,6 +9,7 @@ No boiler write controls are implemented. The heater is currently out of service
 - [Setup, behavior, limitations and tests](docs/runtime.md)
 - [Design context](docs/design.md)
 - [OpenV support-gap comparison](docs/openv-support-gaps.md)
+- [Other home automation integrations](docs/integration-survey.md)
 - [Migration provenance and outstanding import gaps](docs/migration.md)
 - [Development instructions](AGENTS.md)
 
