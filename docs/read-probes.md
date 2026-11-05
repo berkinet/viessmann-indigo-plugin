@@ -33,3 +33,7 @@ The daemon accepted a reload through the symlink. Both that session and a fresh 
 Future targets in the xml directory must be complete vito XML configurations, not the repository fragment. Validate a new target before selecting it; switch the symlink via a prepared temporary link and rename, then reload and verify the catalogue. A link switch alone does not update daemon memory. If a reload fails, restore the previous link and reload it rather than assuming the running configuration changed.
 
 For rollback to the pre-probe content, first copy the unchanged vito.xml-bak into xml under a distinct baseline name, preserving it as a backup, then point vito.xml to that complete baseline and reload. Avoid copying over the live symlink: ordinary copy operations may overwrite its selected target and destroy the intended version history.
+
+## Owner consolidated saved versions
+
+The owner moved saved XML versions into `/etc/vcontrold/xml`. Read-only verification found `revtest.xml`, `vito.xml-1`, `vito.xml-2053`, `vito.xml-bak`, and `vito.xml.sav` there. The current pre-probe backup path is therefore **/etc/vcontrold/xml/vito.xml-bak**, superseding earlier rollback path references. The active symlink still resolves to xml/revtest.xml, its SHA-256 is unchanged, and the selected XML parses successfully. No daemon reload was needed or performed for moving inactive saved versions.
