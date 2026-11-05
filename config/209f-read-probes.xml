@@ -1,0 +1,69 @@
+<?xml version='1.0' encoding='utf-8'?>
+<commands>
+  <command name="getProbeFlowA1" protocmd="getaddr">
+    <description>Candidate A1 flow temperature; OpenV 209F table; unverified</description>
+    <device ID="209F">
+      <addr>0810</addr>
+      <len>2</len>
+      <unit>UT</unit>
+    </device>
+  </command>
+  <command name="getProbeStorage" protocmd="getaddr">
+    <description>Candidate filtered storage temperature; OpenV 209F table; unverified</description>
+    <device ID="209F">
+      <addr>0812</addr>
+      <len>2</len>
+      <unit>UT</unit>
+    </device>
+  </command>
+  <command name="getProbeBurner1" protocmd="getaddr">
+    <description>Candidate burner stage 1; raw byte; unverified</description>
+    <device ID="209F">
+      <addr>0842</addr>
+      <len>1</len>
+    </device>
+  </command>
+  <command name="getProbeProgram" protocmd="getaddr">
+    <description>Candidate operating program; raw byte; do not use legacy BA mapping</description>
+    <device ID="209F">
+      <addr>2323</addr>
+      <len>1</len>
+    </device>
+  </command>
+  <command name="getProbeCurveLevel" protocmd="getaddr">
+    <description>Candidate heating curve shift; raw byte; signed decoding unverified</description>
+    <device ID="209F">
+      <addr>27D4</addr>
+      <len>1</len>
+    </device>
+  </command>
+  <command name="getProbeCurveSlope" protocmd="getaddr">
+    <description>Candidate heating curve slope; raw byte; wiki suggests divide by 10</description>
+    <device ID="209F">
+      <addr>27D3</addr>
+      <len>1</len>
+    </device>
+  </command>
+  <command name="getProbeSolarDay" protocmd="getaddr">
+    <description>Candidate solar daily yield; raw bytes; only relevant with solar hardware</description>
+    <device ID="209F">
+      <addr>CF30</addr>
+      <len>4</len>
+    </device>
+  </command>
+  <command name="getProbeStarts" protocmd="getaddr">
+    <description>Candidate four-byte burner starts; raw bytes; compare with existing two-byte read</description>
+    <device ID="209F">
+      <addr>088A</addr>
+      <len>4</len>
+    </device>
+  </command>
+  <command name="getProbeRoomTemp" protocmd="getaddr">
+    <description>LOW CONFIDENCE measured room temperature candidate from 20CB example; not verified for 209F</description>
+    <device ID="209F">
+      <addr>0896</addr>
+      <len>2</len>
+      <unit>UT</unit>
+    </device>
+  </command>
+</commands>

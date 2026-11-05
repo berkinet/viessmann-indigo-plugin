@@ -71,3 +71,7 @@ No configuration patch or plugin capability was enabled by this report. Writes r
 Wiki checkout revision: `3a5fee2b0c2060dd38b44a1e173ab8147b29bb8a`. Sources read: Adressen.md, Geräte.md, vito.xml.md, openHab-Integration.md, and files/vito.xml. The devices page associates both KO1B and KO2B with 209F and describes revision-dependent identification: [OpenV devices](https://github.com/openv/openv/wiki/Ger%C3%A4te).
 
 Local comparison applied base command fields then 209F-specific overrides, comparing normalized addresses and lengths rather than command names. The deployed main configuration's unit definitions were read to check CO, CS, BA, UN, UT and UT1 conversions. A local temporary snapshot was used; raw Pi configuration was not added to the public repository.
+
+## Subsequent authorized configuration change
+
+The owner subsequently authorized additions to the deployed XML. See read-probes.md for the nine isolated experimental reads, verification and backup. Their registration does not change the evidence status above or enable them in the plugin.
