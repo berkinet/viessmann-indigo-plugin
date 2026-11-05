@@ -23,3 +23,13 @@ The committed [XML fragment](../config/209f-read-probes.xml) contains only the n
 Validation: Python XML parse; unique command names; getaddr-only additions; original command semantics preserved; metadata-only daemon reload succeeded and all nine names appeared in its command catalogue. No candidate reads or boiler writes were executed. The plugin's allowlist remains the four original reads, so it will not automatically poll these candidates.
 
 Rollback: restore /etc/vcontrold/vito.xml-bak to /etc/vcontrold/vito.xml and reload the daemon's definitions. Do not run rollback now; the additions have been accepted and are awaiting post-repair validation.
+
+## Versioned XML layout
+
+The owner subsequently authorized moving the complete current command file to `/etc/vcontrold/xml/revtest.xml` and selecting it through the relative symlink `/etc/vcontrold/vito.xml -> xml/revtest.xml`. The move preserves the original file ownership and permissions. Its contents and SHA-256 remain unchanged from the probe deployment recorded above. `/etc/vcontrold/vito.xml-bak` remains untouched as a regular backup file.
+
+The daemon accepted a reload through the symlink. Both that session and a fresh TCP session listed all nine probe commands, confirming the parent daemon also uses the reloaded definitions. Verification used metadata commands only; no heater read/write was sent.
+
+Future targets in the xml directory must be complete vito XML configurations, not the repository fragment. Validate a new target before selecting it; switch the symlink via a prepared temporary link and rename, then reload and verify the catalogue. A link switch alone does not update daemon memory. If a reload fails, restore the previous link and reload it rather than assuming the running configuration changed.
+
+For rollback to the pre-probe content, first copy the unchanged vito.xml-bak into xml under a distinct baseline name, preserving it as a backup, then point vito.xml to that complete baseline and reload. Avoid copying over the live symlink: ordinary copy operations may overwrite its selected target and destroy the intended version history.
