@@ -7,7 +7,7 @@ After=vcontrold-simulator.service
 Type=simple
 User=rdp
 WorkingDirectory=/home/rdp/viessmann/simulator
-ExecStart=/usr/local/sbin/vcontrold -n -x /home/rdp/viessmann/simulator/config/vcontrold.xml -d 127.0.0.1:6578 -p 3003 -L 127.0.0.1 -l /home/rdp/viessmann/simulator/vcontrold-test.log -P /home/rdp/viessmann/simulator/vcontrold-test.pid
+ExecStart=/usr/local/sbin/vcontrold -n -x /home/rdp/viessmann/simulator/config/vcontrold.xml -d 127.0.0.1:6578 -p 3002 -L 192.168.5.37 -l /home/rdp/viessmann/simulator/vcontrold-test.log -P /home/rdp/viessmann/simulator/vcontrold-test.pid
 Restart=on-failure
 RestartSec=2
 NoNewPrivileges=true
@@ -18,6 +18,7 @@ ProtectHome=read-only
 ReadWritePaths=/home/rdp/viessmann/simulator
 IPAddressDeny=any
 IPAddressAllow=localhost
+IPAddressAllow=192.168.5.0/24
 
 [Install]
 WantedBy=multi-user.target

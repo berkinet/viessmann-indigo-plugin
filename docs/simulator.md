@@ -17,7 +17,7 @@ Both have PrivateDevices and loopback-only IP restrictions. The test daemon does
 
 Initial XML serialization removed an unused namespace declaration required by vcontrold. The TEST configuration was corrected to retain xmlns:vcontrol explicitly; test service startup then succeeded. The committed preparation script includes that correction. Building only vsim from the separate source copy reported an unknown generated version header because git metadata was omitted; the TCP-facing daemon uses the installed versioned production binary, not that generated header.
 
-## Access from the Indigo Mac
+## Original tunnel setup (superseded below)
 
 A local SSH tunnel was started on this Mac:
 
@@ -52,3 +52,13 @@ Two consecutive cycles through the actual plugin Client returned all four expect
 The preparation script and fixture manifest are under tools/simulator/. prepare_on_pi.py is a Pi-side setup helper for the documented source location and requires a new, absent simulator directory; it does not install the systemd units by itself. The live unit files are in /etc/systemd/system and their definitions are preserved alongside that helper. No upstream source is vendored into the plugin bundle.
 
 To stop the test environment, use sudo systemctl stop vcontrold-test vcontrold-simulator on the Pi. To prevent startup at boot, also disable those two units. Never substitute the production vcontrol.service name in these commands.
+
+## Current endpoint: direct Pi port 3002
+
+At the owner's explicit request, the unused physical-heater vcontrold was stopped and its vcontrol.service disabled. The old no-argument daemon PID 3487476 remained alive after the initial SysV disable operation and was explicitly terminated after verifying its executable and arguments. vcontrol.service is now inactive and disabled.
+
+The simulator-backed vcontrold-test.service now listens on **192.168.5.37:3002**, permitted to localhost and 192.168.5.0/24. Its backend remains **127.0.0.1:6578** (vsim), with physical-device access disabled. Both simulator services remain enabled at boot. Port 3003 is no longer used. A vcontrold process is intentionally still running: it is the text-protocol frontend to vsim, not a connection to the heater. Verified PID 3915402 has explicit simulator configuration and device arguments; vsim PID 3899974 owns loopback port 6578.
+
+Two direct polls from the Indigo Mac to 192.168.5.37:3002 returned the expected four synthetic values with no release errors. The owner switched the Indigo system device to the direct endpoint. The obsolete Mac SSH tunnel was stopped. The smoke-test helper now defaults to the direct Pi endpoint. No plugin binary update is required.
+
+Production main/command XML symlinks remain unchanged. Copies of the test unit/config before the port switch are retained beside those files with before-port-switch suffixes. To restore real hardware after repair: stop/disable vcontrold-test.service first to release 3002, then enable/start vcontrol.service. Stop/disable vsim too if no longer needed. Keep a SIMULATOR label on the Indigo device until that deliberate switch and real-read validation; the shared endpoint cannot itself distinguish simulated versus physical readings.
