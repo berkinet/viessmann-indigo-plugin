@@ -20,4 +20,18 @@ The owner permits commits, pushes, and publication within requested work unless 
 
 At stage transitions (alpha, beta, release), after substantial design changes or refactoring, and periodically during sustained development, review relevant tests proportionally. Before starting a review, notify the owner of its trigger and proposed scope; this is notice, not an approval request.
 
-Keep tests focused on requirements, meaningful failure modes, and plausible regressions. Update or remove obsolete tests, consolidate redundant coverage, and retain valuable regression protection. Avoid tests that mirror implementation. Account for maintenance and runtime costs; inspect selectively and report significant coverage changes and reasons. Do not treat test count as evidence of quality. No executable tests are needed for this initial documentation-only migration.
+Keep tests focused on requirements, meaningful failure modes, and plausible regressions. Update or remove obsolete tests, consolidate redundant coverage, and retain valuable regression protection. Avoid tests that mirror implementation. Account for maintenance and runtime costs; inspect selectively and report significant coverage changes and reasons. Do not treat test count as evidence of quality. The project now includes a read-only implementation; run the meaningful offline simulator and Indigo-adapter tests when communications or lifecycle behavior changes.
+
+## Confirmed system model
+
+Follow the owner-confirmed architecture section in docs/design.md over earlier provisional device/circuit assumptions: one boiler with internal DHW heat exchanger; Viessmann system, Viessmann heater, and Viessmann water heater logical devices; shared communications manager. Manual-verified normal operating programs are Standby (frost protection active), Only DHW, and Heating and DHW. See docs/manual-modes.md; the earlier heat-only description is superseded. Mode encodings and native Indigo action mappings remain unverified. Measured room temperature is known to the controller but not currently retrievable through a verified vcontrold command; roomTemp in the legacy script is a setpoint.
+
+Mode clarification pending: the later Vitodata screenshot shows mode 1 as Only DHW, conflicting with the earlier heat-only description. See docs/vitodata-observations.md; do not implement the earlier mode truth table until resolved.
+
+The model-specific manual now resolves the semantic mode discrepancy; numeric protocol encodings remain unverified. Do not implement a heat-only program or silently lower the DHW target to simulate one.
+
+The later iOS screenshot shows five program choices, including Continuous reduced and Continuous standard. The manual documents three normal programs, not a proven exhaustive remote-control list. See docs/manual-modes.md; keep support capability-driven and do not invent continuous-mode semantics or numeric encodings.
+
+The owner emphasizes limited accessible functions/controls. Do not aim for Vitodata/iOS parity or expose controls solely because the app/manual/XML lists them. Scope implementation to verified accessible capabilities; the five app programs are reference candidates, not promised support.
+
+Implementation baseline: persistent TCP owned by one manager; close releases Optolink between cycles without closing TCP. Poll interval defaults to 180 seconds on the system device. Polling starts disabled; do not enable live polling while the heater is out of service. See docs/runtime.md.

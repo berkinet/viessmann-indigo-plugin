@@ -1,24 +1,20 @@
 # Viessmann Indigo plugin
 
-Local design workspace for an Indigo plugin communicating with a Viessmann Vitotronic 200 KO1B/KO2B through the existing Raspberry Pi running vcontrold on TCP port 3002 and an Optolink connection.
+Read-only development build for an Indigo plugin using a Raspberry Pi running vcontrold on TCP port 3002 and Optolink to a Vitotronic 200 KO1B/KO2B.
 
-Status: context migration and design only. No plugin implementation, verified command catalogue, or boiler write support exists yet.
+The initial implementation provides three logical custom devices: **Viessmann system**, **Viessmann heater**, and **Viessmann water heater**. One shared manager owns a persistent TCP connection, polls the four legacy read mappings, and releases the optical link between cycles. The system's polling interval defaults to 180 seconds and is configurable. Polling is disabled by default.
 
-## Intended architecture
+No boiler write controls are implemented. The heater is currently out of service, so successful controller readings and live Indigo loading remain unverified. Nothing has been installed into the operational Indigo setup.
 
-One shared TCP communications and polling manager serves all logical devices. The proposed device split is a system device, central heating thermostat, and domestic hot water thermostat. The thermostat split remains provisional until supported parameters and suitable native Indigo controls are verified.
-
-Classify each parameter by system/heating/DHW scope, read/write capability, and native Indigo control suitability. Verify commands against the installed vito.xml and current polling scripts before implementing them. Never send unverified boiler writes.
-
-## Persistent context
-
-- [Design and parameter inventory](docs/design.md)
-- [Migration provenance and limitations](docs/migration.md)
+- [Setup, behavior, limitations and tests](docs/runtime.md)
+- [Design context](docs/design.md)
+- [Migration provenance and outstanding import gaps](docs/migration.md)
 - [Development instructions](AGENTS.md)
-- [Original Indigo variables screenshot](docs/sources/indigo-variables.png)
 
-Next step: obtain the actual deployed vito.xml and polling scripts, identify controller and runtime versions, and build an evidence-backed read-command inventory. Preserve existing Indigo variable names where practical; decide variable compatibility before replacing existing polling.
+Source bundle: `Viessmann.indigoPlugin` (development version 0.1.0).
 
-Public GitHub repository: https://github.com/berkinet/viessmann-indigo-plugin
+```zsh
+python3 -m unittest discover -s tests -v
+```
 
-The owner confirmed the repository name, public visibility, and publication of these documents and the variables screenshot on 5 November 2026.
+Public repository: https://github.com/berkinet/viessmann-indigo-plugin

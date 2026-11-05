@@ -1,0 +1,194 @@
+<?xml version='1.0' encoding='utf-8'?>
+<Devices>
+  <Device id="viessmannSystem" type="custom">
+    <Name>Viessmann system</Name>
+    <ConfigUI>
+      <Field id="host" type="textfield" defaultValue="">
+        <Label>vcontrold host:</Label>
+        <Description>Raspberry Pi hostname or IP address.</Description>
+      </Field>
+      <Field id="port" type="textfield" defaultValue="3002">
+        <Label>TCP port:</Label>
+      </Field>
+      <Field id="pollInterval" type="textfield" defaultValue="180">
+        <Label>Polling interval (seconds):</Label>
+        <Description>30–86400 seconds after each cycle completes.</Description>
+      </Field>
+      <Field id="timeout" type="textfield" defaultValue="12">
+        <Label>Response timeout (seconds):</Label>
+        <Description>1–60 seconds per command.</Description>
+      </Field>
+      <Field id="pollingEnabled" type="checkbox" defaultValue="false">
+        <Label>Polling:</Label>
+        <Description>Enable when ready to read the heater. No boiler writes.</Description>
+      </Field>
+    </ConfigUI>
+    <States>
+      <State id="dataValid">
+        <ValueType>Boolean</ValueType>
+        <TriggerLabel>Data valid</TriggerLabel>
+        <ControlPageLabel>Data valid</ControlPageLabel>
+      </State>
+      <State id="status">
+        <ValueType>String</ValueType>
+        <TriggerLabel>Status</TriggerLabel>
+        <ControlPageLabel>Status</ControlPageLabel>
+      </State>
+      <State id="lastAttempt">
+        <ValueType>String</ValueType>
+        <TriggerLabel>Last attempt (UTC)</TriggerLabel>
+        <ControlPageLabel>Last attempt (UTC)</ControlPageLabel>
+      </State>
+      <State id="lastSuccess">
+        <ValueType>String</ValueType>
+        <TriggerLabel>Last complete success (UTC)</TriggerLabel>
+        <ControlPageLabel>Last complete success (UTC)</ControlPageLabel>
+      </State>
+      <State id="lastError">
+        <ValueType>String</ValueType>
+        <TriggerLabel>Last error</TriggerLabel>
+        <ControlPageLabel>Last error</ControlPageLabel>
+      </State>
+      <State id="tcpAvailable">
+        <ValueType>Boolean</ValueType>
+        <TriggerLabel>TCP available at last attempt</TriggerLabel>
+        <ControlPageLabel>TCP available at last attempt</ControlPageLabel>
+      </State>
+      <State id="boilerTemp">
+        <ValueType>Number</ValueType>
+        <TriggerLabel>Boiler temperature (C)</TriggerLabel>
+        <ControlPageLabel>Boiler temperature (C)</ControlPageLabel>
+      </State>
+      <State id="boilerTempValid">
+        <ValueType>Boolean</ValueType>
+        <TriggerLabel>Boiler temperature valid</TriggerLabel>
+        <ControlPageLabel>Boiler temperature valid</ControlPageLabel>
+      </State>
+      <State id="boilerTempUpdated">
+        <ValueType>String</ValueType>
+        <TriggerLabel>Boiler temperature last success (UTC)</TriggerLabel>
+        <ControlPageLabel>Boiler temperature last success (UTC)</ControlPageLabel>
+      </State>
+      <State id="outsideTemp">
+        <ValueType>Number</ValueType>
+        <TriggerLabel>Outside temperature (C)</TriggerLabel>
+        <ControlPageLabel>Outside temperature (C)</ControlPageLabel>
+      </State>
+      <State id="outsideTempValid">
+        <ValueType>Boolean</ValueType>
+        <TriggerLabel>Outside temperature valid</TriggerLabel>
+        <ControlPageLabel>Outside temperature valid</ControlPageLabel>
+      </State>
+      <State id="outsideTempUpdated">
+        <ValueType>String</ValueType>
+        <TriggerLabel>Outside temperature last success (UTC)</TriggerLabel>
+        <ControlPageLabel>Outside temperature last success (UTC)</ControlPageLabel>
+      </State>
+    </States>
+    <UiDisplayStateId>status</UiDisplayStateId>
+  </Device>
+  <Device id="viessmannHeater" type="custom">
+    <Name>Viessmann heater</Name>
+    <ConfigUI>
+      <Field id="systemId" type="menu">
+        <Label>Viessmann system:</Label>
+        <List class="self" method="getSystems" />
+      </Field>
+    </ConfigUI>
+    <States>
+      <State id="dataValid">
+        <ValueType>Boolean</ValueType>
+        <TriggerLabel>Data valid</TriggerLabel>
+        <ControlPageLabel>Data valid</ControlPageLabel>
+      </State>
+      <State id="status">
+        <ValueType>String</ValueType>
+        <TriggerLabel>Status</TriggerLabel>
+        <ControlPageLabel>Status</ControlPageLabel>
+      </State>
+      <State id="lastAttempt">
+        <ValueType>String</ValueType>
+        <TriggerLabel>Last attempt (UTC)</TriggerLabel>
+        <ControlPageLabel>Last attempt (UTC)</ControlPageLabel>
+      </State>
+      <State id="lastSuccess">
+        <ValueType>String</ValueType>
+        <TriggerLabel>Last complete success (UTC)</TriggerLabel>
+        <ControlPageLabel>Last complete success (UTC)</ControlPageLabel>
+      </State>
+      <State id="lastError">
+        <ValueType>String</ValueType>
+        <TriggerLabel>Last error</TriggerLabel>
+        <ControlPageLabel>Last error</ControlPageLabel>
+      </State>
+      <State id="roomSetpoint">
+        <ValueType>Number</ValueType>
+        <TriggerLabel>Room setpoint (C)</TriggerLabel>
+        <ControlPageLabel>Room setpoint (C)</ControlPageLabel>
+      </State>
+      <State id="roomSetpointValid">
+        <ValueType>Boolean</ValueType>
+        <TriggerLabel>Room setpoint valid</TriggerLabel>
+        <ControlPageLabel>Room setpoint valid</ControlPageLabel>
+      </State>
+      <State id="roomSetpointUpdated">
+        <ValueType>String</ValueType>
+        <TriggerLabel>Room setpoint last success (UTC)</TriggerLabel>
+        <ControlPageLabel>Room setpoint last success (UTC)</ControlPageLabel>
+      </State>
+    </States>
+    <UiDisplayStateId>status</UiDisplayStateId>
+  </Device>
+  <Device id="viessmannWaterHeater" type="custom">
+    <Name>Viessmann water heater</Name>
+    <ConfigUI>
+      <Field id="systemId" type="menu">
+        <Label>Viessmann system:</Label>
+        <List class="self" method="getSystems" />
+      </Field>
+    </ConfigUI>
+    <States>
+      <State id="dataValid">
+        <ValueType>Boolean</ValueType>
+        <TriggerLabel>Data valid</TriggerLabel>
+        <ControlPageLabel>Data valid</ControlPageLabel>
+      </State>
+      <State id="status">
+        <ValueType>String</ValueType>
+        <TriggerLabel>Status</TriggerLabel>
+        <ControlPageLabel>Status</ControlPageLabel>
+      </State>
+      <State id="lastAttempt">
+        <ValueType>String</ValueType>
+        <TriggerLabel>Last attempt (UTC)</TriggerLabel>
+        <ControlPageLabel>Last attempt (UTC)</ControlPageLabel>
+      </State>
+      <State id="lastSuccess">
+        <ValueType>String</ValueType>
+        <TriggerLabel>Last complete success (UTC)</TriggerLabel>
+        <ControlPageLabel>Last complete success (UTC)</ControlPageLabel>
+      </State>
+      <State id="lastError">
+        <ValueType>String</ValueType>
+        <TriggerLabel>Last error</TriggerLabel>
+        <ControlPageLabel>Last error</ControlPageLabel>
+      </State>
+      <State id="warmWaterTemp">
+        <ValueType>Number</ValueType>
+        <TriggerLabel>DHW temperature (C)</TriggerLabel>
+        <ControlPageLabel>DHW temperature (C)</ControlPageLabel>
+      </State>
+      <State id="warmWaterTempValid">
+        <ValueType>Boolean</ValueType>
+        <TriggerLabel>DHW temperature valid</TriggerLabel>
+        <ControlPageLabel>DHW temperature valid</ControlPageLabel>
+      </State>
+      <State id="warmWaterTempUpdated">
+        <ValueType>String</ValueType>
+        <TriggerLabel>DHW temperature last success (UTC)</TriggerLabel>
+        <ControlPageLabel>DHW temperature last success (UTC)</ControlPageLabel>
+      </State>
+    </States>
+    <UiDisplayStateId>status</UiDisplayStateId>
+  </Device>
+</Devices>
