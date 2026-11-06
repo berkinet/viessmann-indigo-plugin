@@ -420,8 +420,9 @@ class AdapterTests(unittest.TestCase):
             with self.subTest(activity=activity):
                 self.plugin._publish(Result(errors={'boilerTemp': 'timeout'}, tcp_available=True,
                                             optical_activity=activity, optical_checked=True))
-                expected = 'Pending' if activity == 'Detected' else 'Read failed'
                 for dev in self.devices.values():
+                    expected = ('Pending' if activity == 'Detected' else
+                                'System Off' if dev.id == 1 else 'Read failed')
                     self.assertEqual(dev.states['status'], expected)
                     self.assertEqual(dev.error, expected)
                     self.assertFalse(dev.states['dataValid'])
@@ -434,18 +435,43 @@ class AdapterTests(unittest.TestCase):
         # Earlier successful data and activity cannot survive a new failed cycle.
         self.plugin._publish(Result(errors={'boilerTemp': 'Connection refused'}))
         for dev in self.devices.values():
-            self.assertEqual(dev.states['status'], 'Connect failed')
+            self.assertEqual(dev.states['status'], 'Comm Fail' if dev.id == 1 else 'Connect failed')
             self.assertFalse(dev.states['dataValid'])
+
+    def test_system_status_table_and_verified_error_precedence(self):
+        cases = [
+            (Result(), 'Comm Fail'),
+            (Result(tcp_available=True), 'System Off'),
+            (Result(tcp_available=True, optical_activity='Detected'), 'Pending'),
+            (Result(values={'outsideTemp': 12}, tcp_available=True), 'Online'),
+            (Result(values={'outsideTemp': 12}, tcp_available=True,
+                    verified_active_fault_code='D1'), 'Error D1'),
+            (Result(tcp_available=True, optical_activity='Detected',
+                    verified_active_fault_code='D1'), 'Error D1'),
+            # A fault retained in a disconnected/no-response result cannot
+            # establish a current fault; communication evidence takes precedence.
+            (Result(verified_active_fault_code='D1'), 'Comm Fail'),
+            (Result(tcp_available=True, verified_active_fault_code='D1'), 'System Off'),
+        ]
+        for result, expected in cases:
+            with self.subTest(expected=expected):
+                self.plugin._publish(result)
+                self.assertEqual(self.devices[1].states['status'], expected)
+                self.assertEqual(self.devices[1].error, None if expected == 'Online' else expected)
+        self.plugin._publish(Result(values={'outsideTemp': 12}, tcp_available=True, simulator=True,
+                                    verified_active_fault_code='D1'))
+        self.assertEqual(self.devices[1].states['status'], 'SIMULATOR · Error D1')
+        self.assertEqual(self.devices[1].error, 'Error D1')
 
     def test_connection_failure_is_distinct_from_read_failure(self):
         self.plugin._publish(Result(errors={'boilerTemp': 'Connection refused'}))
         for dev in self.devices.values():
-            self.assertEqual(dev.states['status'], 'Connect failed')
-            self.assertEqual(dev.error, 'Connect failed')
+            self.assertEqual(dev.states['status'], 'Comm Fail' if dev.id == 1 else 'Connect failed')
+            self.assertEqual(dev.error, 'Comm Fail' if dev.id == 1 else 'Connect failed')
         self.plugin._publish(Result(errors={'boilerTemp': 'Response timeout'}, tcp_available=True))
         for dev in self.devices.values():
-            self.assertEqual(dev.states['status'], 'Read failed')
-            self.assertEqual(dev.error, 'Read failed')
+            self.assertEqual(dev.states['status'], 'System Off' if dev.id == 1 else 'Read failed')
+            self.assertEqual(dev.error, 'System Off' if dev.id == 1 else 'Read failed')
 
     def test_live_heater_status_and_requested_display_id_without_measured_input(self):
         self.plugin._publish(Result(values=dict(zip(READS, (66, -3, 20, 46))), tcp_available=True))
@@ -476,7 +502,7 @@ class AdapterTests(unittest.TestCase):
         # Retained measurements must not turn a later total failure into Pending.
         self.plugin._publish(Result(errors={'warmWaterTemp': 'Timeout'}, tcp_available=True))
         for dev in self.devices.values():
-            self.assertEqual(dev.states['status'], 'Read failed')
+            self.assertEqual(dev.states['status'], 'System Off' if dev.id == 1 else 'Read failed')
             self.assertFalse(dev.states['dataValid'])
         self.assertEqual(dhw.states['warmWaterTemp'], 31.1)
 

@@ -161,6 +161,19 @@ class Plugin(indigo.PluginBase):
         dev.updateStatesOnServer(updates)
         dev.setErrorStateOnServer(reason)
 
+    @staticmethod
+    def _system_status(result):
+        if not result.tcp_available:
+            return 'Comm Fail'
+        responding = bool(result.values) or result.optical_activity == 'Detected'
+        if responding and result.verified_active_fault_code:
+            return 'Error ' + result.verified_active_fault_code
+        if result.values:
+            return 'Online'
+        if result.optical_activity == 'Detected':
+            return 'Pending'
+        return 'System Off'
+
     def _publish(self, result):
         stamp = datetime.now(timezone.utc).isoformat(timespec='seconds')
         for device_id in list(self.active):
@@ -190,9 +203,11 @@ class Plugin(indigo.PluginBase):
                 failure = 'Read failed'
             # System connectivity is independent of snapshot completeness.
             online = valid or (dev.deviceTypeId == 'viessmannSystem' and bool(result.values))
+            status = self._system_status(result) if dev.deviceTypeId == 'viessmannSystem' else ('Online' if online else failure)
+            display_error = None if status == 'Online' else status
             updates = [{'key': 'simulator', 'value': result.simulator}, {'key': 'lastAttempt', 'value': stamp},
                        {'key': 'dataValid', 'value': valid},
-                       {'key': 'status', 'value': 'Online' if online else failure},
+                       {'key': 'status', 'value': status},
                        {'key': 'lastError', 'value': '; '.join(errors)[:800]}]
             if dev.deviceTypeId == 'viessmannSystem':
                 updates.extend([{'key': 'tcpAvailable', 'value': result.tcp_available},
@@ -228,10 +243,13 @@ class Plugin(indigo.PluginBase):
                 if dev.deviceTypeId == 'viessmannHeater':
                     label += ' · ' + dev.pluginProps.get('roomTarget', 'standard').title()
                 for update in updates:
-                    if update['key'] == 'status' and online:
-                        update['value'] = label
+                    if update['key'] == 'status':
+                        if dev.deviceTypeId == 'viessmannSystem':
+                            update['value'] = label + ' · ' + status
+                        elif online:
+                            update['value'] = label
             dev.updateStatesOnServer(updates)
-            dev.setErrorStateOnServer(None if online else failure)
+            dev.setErrorStateOnServer(display_error)
 
     def _process_events(self):
         while True:

@@ -57,6 +57,8 @@ class Result:
     optical_activity: str = 'Unavailable'
     optical_error: str = ''
     optical_checked: bool = False
+    # Reserved for a verified CURRENT fault producer, never history alone.
+    verified_active_fault_code: str = ''
 
 
 class Client:

@@ -52,3 +52,18 @@ This verifies passive reception of the expected byte on this installation, indep
 The system is Online if any valid reading arrives in the current poll, independently of snapshot completeness. A child is Online when its required readings succeed. Otherwise a device reports Connect failed when TCP was not established, Pending only when the current probe detected 0x05, and Read failed when TCP connected but no qualifying data or 0x05 evidence is available. Failed/missing child reads no longer become Pending merely because an unrelated register succeeded. If the optional probe is disabled, unsupported or unavailable, it supplies no evidence for Pending.
 
 This supersedes the 0.2.8 rule that activity was informational only. Activity alone now supports Pending, but never Online, dataValid=true or a fault-free conclusion. Per-reading validity, error details and complete-success timestamps remain separate; retained old readings/detections do not qualify a new failed poll. No controller state, polling frequency, or optical probe behavior changes in this release.
+
+
+## Agreed system status table — 0.2.10
+
+System-only labels and precedence are now:
+
+| Condition in current poll | Status |
+| --- | --- |
+| TCP connection not established | Comm Fail |
+| Controller response evidence plus verified active fault code | Error CODE |
+| Any usable current reading | Online |
+| 0x05 detected, no usable readings | Pending |
+| TCP established, no usable readings or detected 0x05 | System Off |
+
+System Off is the owner's chosen inferred label, not independently measured power state. A disabled/unsupported/unavailable probe provides no positive optical evidence and can therefore reach that fallback. Error CODE takes precedence over Online/Pending, but only with current response evidence. Result.verified_active_fault_code is reserved for a future verified current-fault producer; no live polling command sets it yet, so Error CODE is implemented/tested but cannot currently be emitted from live fault history. getErrorX/D1 history is never promoted to current fault state. Child status semantics are unchanged. Simulator system status retains an explicit SIMULATOR prefix without hiding Error CODE. dataValid and diagnostics remain separate.

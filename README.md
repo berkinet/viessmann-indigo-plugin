@@ -16,7 +16,7 @@ Native thermostat children are being trialled with simulator-only, readback-veri
 - [Migration provenance and outstanding import gaps](docs/migration.md)
 - [Development instructions](AGENTS.md)
 
-Source bundle: `Viessmann.indigoPlugin` (development version 0.2.9).
+Source bundle: `Viessmann.indigoPlugin` (development version 0.2.10).
 
 ```zsh
 python3 -m unittest discover -s tests -v
