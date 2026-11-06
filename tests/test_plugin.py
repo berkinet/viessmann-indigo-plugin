@@ -341,6 +341,28 @@ class AdapterTests(unittest.TestCase):
             self.assertEqual(dev.states['status'], 'Read failed')
             self.assertEqual(dev.error, 'Read failed')
 
+    def test_incomplete_shared_snapshot_is_pending_and_preserves_details(self):
+        self.plugin._publish(Result(values={'warmWaterTemp': 31.1},
+                                    errors={'roomSetpoint': 'Invalid reading: ERR'},
+                                    tcp_available=True))
+        for device_id in (1, 2):
+            dev = self.devices[device_id]
+            self.assertEqual(dev.states['status'], 'Pending')
+            self.assertEqual(dev.error, 'Pending')
+            self.assertFalse(dev.states['dataValid'])
+            self.assertIn('Invalid reading', dev.states['lastError'])
+        dhw = self.devices[3]
+        self.assertEqual(dhw.states['status'], 'Current')
+        self.assertTrue(dhw.states['dataValid'])
+        self.assertEqual(dhw.states['warmWaterTemp'], 31.1)
+        self.assertIsNone(dhw.error)
+        # Retained measurements must not turn a later total failure into Pending.
+        self.plugin._publish(Result(errors={'warmWaterTemp': 'Timeout'}, tcp_available=True))
+        for dev in self.devices.values():
+            self.assertEqual(dev.states['status'], 'Read failed')
+            self.assertFalse(dev.states['dataValid'])
+        self.assertEqual(dhw.states['warmWaterTemp'], 31.1)
+
     def test_parent_stop_and_invalid_properties_fail_closed(self):
         self.devices[1].pluginProps['pollingEnabled'] = True
         self.plugin._configure()

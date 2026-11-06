@@ -47,3 +47,8 @@ Version 0.2.3 adds Plugins > Viessmann > Request system status, plus a device ac
 ## 0.2.4: connection versus read failures
 
 The device status and Indigo error banner now say Connect failed when TCP connection establishment fails, with host:port and the underlying error in lastError. Read failed means TCP connected but the greeting, protocol response, reading, or link release failed. tcpAvailable records TCP establishment, not successful heater communication; a greeting timeout therefore counts as Read failed. Existing measurements and validity handling remain unchanged.
+
+
+## 0.2.5: Pending for incomplete snapshots
+
+When TCP connects and the current shared poll returns some valid readings, devices missing their required data show Pending rather than Read failed. A child whose required reads succeeded remains Current. Connect failed still means TCP establishment failed; Read failed means no valid readings were obtained in the current poll. Retained values from previous polls do not count as current successes. Pending leaves dataValid false and preserves underlying failures in lastError, with per-reading validity and timestamps unchanged.

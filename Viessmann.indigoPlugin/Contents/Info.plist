@@ -9,9 +9,9 @@
 	<key>CFBundleName</key>
 	<string>Viessmann</string>
 	<key>CFBundleVersion</key>
-	<string>0.2.4</string>
+	<string>0.2.5</string>
 	<key>PluginVersion</key>
-	<string>0.2.4</string>
+	<string>0.2.5</string>
 	<key>ServerApiVersion</key>
 	<string>3.9</string>
 </dict>

@@ -173,7 +173,12 @@ class Plugin(indigo.PluginBase):
                       if dev.deviceTypeId == 'viessmannSystem' or key in keys]
             if result.release_error:
                 errors.append('Link release: ' + result.release_error)
-            failure = 'Read failed' if result.tcp_available else 'Connect failed'
+            if not result.tcp_available:
+                failure = 'Connect failed'
+            elif result.values:
+                failure = 'Pending'
+            else:
+                failure = 'Read failed'
             updates = [{'key': 'simulator', 'value': result.simulator}, {'key': 'lastAttempt', 'value': stamp},
                        {'key': 'dataValid', 'value': valid},
                        {'key': 'status', 'value': 'Current' if valid else failure},
