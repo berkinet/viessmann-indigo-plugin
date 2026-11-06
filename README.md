@@ -12,6 +12,7 @@ Native thermostat children are being trialled with simulator-only, readback-veri
 - [Isolated simulator for UI/configuration testing](docs/simulator.md)
 - [Design context](docs/design.md)
 - [OpenV support-gap comparison](docs/openv-support-gaps.md)
+- [Measured room-temperature research](docs/room-temperature-research.md)
 - [Other home automation integrations](docs/integration-survey.md)
 - [Migration provenance and outstanding import gaps](docs/migration.md)
 - [Development instructions](AGENTS.md)
