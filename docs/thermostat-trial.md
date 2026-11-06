@@ -42,3 +42,8 @@ Targeted tests cover callback routing, coalescing, disabled one-shot operation a
 The owner confirmed that the custom system device does not show a Send Status Request button, even when recreated. The 0.2.2 capability flag did not provide that UI; the earlier implication that it would was incorrect. Thermostat children retain their native buttons.
 
 Version 0.2.3 adds Plugins > Viessmann > Request system status, plus a device action named Request status for all three device types. Both use the existing serialized shared refresh path, including one-shot reads while periodic polling is disabled. The device action can also be assigned to a Control Page button. No device recreation is needed. Installation remains owner-managed through GitHub.
+
+
+## 0.2.4: connection versus read failures
+
+The device status and Indigo error banner now say Connect failed when TCP connection establishment fails, with host:port and the underlying error in lastError. Read failed means TCP connected but the greeting, protocol response, reading, or link release failed. tcpAvailable records TCP establishment, not successful heater communication; a greeting timeout therefore counts as Read failed. Existing measurements and validity handling remain unchanged.

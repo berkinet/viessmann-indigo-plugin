@@ -331,6 +331,16 @@ class AdapterTests(unittest.TestCase):
         self.plugin._process_events()
         self.assertFalse(self.plugin.manager.requested)
 
+    def test_connection_failure_is_distinct_from_read_failure(self):
+        self.plugin._publish(Result(errors={'boilerTemp': 'Connection refused'}))
+        for dev in self.devices.values():
+            self.assertEqual(dev.states['status'], 'Connect failed')
+            self.assertEqual(dev.error, 'Connect failed')
+        self.plugin._publish(Result(errors={'boilerTemp': 'Response timeout'}, tcp_available=True))
+        for dev in self.devices.values():
+            self.assertEqual(dev.states['status'], 'Read failed')
+            self.assertEqual(dev.error, 'Read failed')
+
     def test_parent_stop_and_invalid_properties_fail_closed(self):
         self.devices[1].pluginProps['pollingEnabled'] = True
         self.plugin._configure()

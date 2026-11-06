@@ -104,6 +104,7 @@ class Client:
             if self.sock is None:
                 self.sock = socket.create_connection(
                     (self.settings.host, self.settings.port), min(5, self.settings.timeout))
+                result.tcp_available = True
                 self._frame(cancelled)
             result.tcp_available = True
             try:
@@ -140,7 +141,8 @@ class Client:
             self.disconnect()
             for key in READS:
                 if key not in result.values and key not in result.errors:
-                    result.errors[key] = str(exc)
+                    result.errors[key] = (str(exc) if result.tcp_available else
+                                          f"Connect to {self.settings.host}:{self.settings.port} failed: {exc}")
         return result
 
 

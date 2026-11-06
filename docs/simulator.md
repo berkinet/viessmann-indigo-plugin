@@ -66,3 +66,27 @@ Production main/command XML symlinks remain unchanged. Copies of the test unit/c
 ## Native thermostat trial extension
 
 The simulator now has a distinct identity and four stateful target setters for UI testing. The earlier read-only-only description is superseded for the test environment by thermostat-trial.md. The actual heater XML remains unchanged. Test-daemon service now uses normal forked-client mode and its PIDFile so multiple clients can connect.
+
+## Return to live Optolink — 6 November 2026
+
+At the owner's request the Pi is back in live operation on 192.168.5.37:3002. Both simulator units are stopped and disabled; vcontrol.service is started and enabled. The live XML symlinks remain unchanged. /etc/default/vcontrold now supplies explicit -x /etc/vcontrold/vcontrold.xml, -d /dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0, and -l /var/log/vcontrold.log. The old /tmp log was retained; reopening that nobody-owned file as root failed under Linux's /tmp protection. The explicit serial argument also avoids the corrupted XML-derived path observed in the old log.
+
+Run on the Pi to switch to live:
+
+```zsh
+sudo systemctl disable --now vcontrold-test.service
+sudo systemctl disable --now vcontrold-simulator.service
+sudo systemctl enable vcontrol.service
+sudo systemctl restart vcontrol.service
+```
+
+To return to simulation, stop live before starting the simulator stack:
+
+```zsh
+sudo systemctl stop vcontrol.service
+sudo systemctl disable vcontrol.service
+sudo systemctl enable --now vcontrold-simulator.service
+sudo systemctl enable --now vcontrold-test.service
+```
+
+Verify the process and listener with `pgrep -a vcontrold` and `sudo ss -ltnp`. The legacy SysV wrapper can report active even when its daemon failed, so service state alone is insufficient. Live identity metadata returned V200KO2B (ID=209F) (Protocol=KW2), not SIMULATOR_209F. This verifies the configured endpoint, not successful heater telemetry. No boiler reads or writes were issued for this switch; only daemon metadata and close were requested. Indigo's endpoint stays unchanged. Simulator-only write gating remains in place.
