@@ -39,3 +39,9 @@ Sources:
 - https://github.com/philippoo66/optolink-splitter/discussions/170
 
 The DIY reports demonstrate reception of periodic 05 bytes independently of register-read success on other systems. Model-specific behavior during burner lockout remains unverified on this installation.
+
+## Brief powered-on receive-only observation — 6 November 2026
+
+After the owner explicitly confirmed that a brief power-on was safe (remaining powered until failure was not), temporarily stopped vcontrol.service and listened directly through the existing CP2102 serial adapter at 4800 8E2. The monitor contained no serial writes or register requests. It received nine 0x05 bytes from 16:20:36.035 through 16:20:54.081 UTC, at intervals of roughly 2.2–2.4 seconds. The owner was immediately told the first byte had been detected and that the heater could be switched off. No more bytes had been observed by the subsequent checks. Power state was not independently measured.
+
+This verifies passive reception of the expected byte on this installation, independent of any register query. It does not yet verify the plugin's raw-mode implementation end-to-end or behavior while the burner is faulted. A receive-only monitor held the serial port while vcontrold was stopped; it was not a competing serial reader. Service restoration is handled by the monitor shell's EXIT trap.
