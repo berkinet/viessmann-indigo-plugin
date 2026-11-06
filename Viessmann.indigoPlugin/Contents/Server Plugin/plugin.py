@@ -184,9 +184,11 @@ class Plugin(indigo.PluginBase):
                 failure = 'Pending'
             else:
                 failure = 'Read failed'
+            # System connectivity is independent of snapshot completeness.
+            online = valid or (dev.deviceTypeId == 'viessmannSystem' and bool(result.values))
             updates = [{'key': 'simulator', 'value': result.simulator}, {'key': 'lastAttempt', 'value': stamp},
                        {'key': 'dataValid', 'value': valid},
-                       {'key': 'status', 'value': 'Online' if valid else failure},
+                       {'key': 'status', 'value': 'Online' if online else failure},
                        {'key': 'lastError', 'value': '; '.join(errors)[:800]}]
             if dev.deviceTypeId == 'viessmannSystem':
                 updates.append({'key': 'tcpAvailable', 'value': result.tcp_available})
@@ -217,10 +219,10 @@ class Plugin(indigo.PluginBase):
                 if dev.deviceTypeId == 'viessmannHeater':
                     label += ' · ' + dev.pluginProps.get('roomTarget', 'standard').title()
                 for update in updates:
-                    if update['key'] == 'status' and valid:
+                    if update['key'] == 'status' and online:
                         update['value'] = label
             dev.updateStatesOnServer(updates)
-            dev.setErrorStateOnServer(None if valid else failure)
+            dev.setErrorStateOnServer(None if online else failure)
 
     def _process_events(self):
         while True:
