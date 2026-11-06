@@ -184,7 +184,7 @@ class Plugin(indigo.PluginBase):
                 errors.append('Link release: ' + result.release_error)
             if not result.tcp_available:
                 failure = 'Connect failed'
-            elif result.values:
+            elif result.optical_activity == 'Detected':
                 failure = 'Pending'
             else:
                 failure = 'Read failed'

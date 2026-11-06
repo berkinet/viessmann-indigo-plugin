@@ -45,3 +45,10 @@ The DIY reports demonstrate reception of periodic 05 bytes independently of regi
 After the owner explicitly confirmed that a brief power-on was safe (remaining powered until failure was not), temporarily stopped vcontrol.service and listened directly through the existing CP2102 serial adapter at 4800 8E2. The monitor contained no serial writes or register requests. It received nine 0x05 bytes from 16:20:36.035 through 16:20:54.081 UTC, at intervals of roughly 2.2–2.4 seconds. The owner was immediately told the first byte had been detected and that the heater could be switched off. No more bytes had been observed by the subsequent checks. Power state was not independently measured.
 
 This verifies passive reception of the expected byte on this installation, independent of any register query. It does not yet verify the plugin's raw-mode implementation end-to-end or behavior while the burner is faulted. A receive-only monitor held the serial port while vcontrold was stopped; it was not a competing serial reader. Service restoration is handled by the monitor shell's EXIT trap.
+
+
+## Status heuristic — 0.2.9
+
+The system is Online if any valid reading arrives in the current poll, independently of snapshot completeness. A child is Online when its required readings succeed. Otherwise a device reports Connect failed when TCP was not established, Pending only when the current probe detected 0x05, and Read failed when TCP connected but no qualifying data or 0x05 evidence is available. Failed/missing child reads no longer become Pending merely because an unrelated register succeeded. If the optional probe is disabled, unsupported or unavailable, it supplies no evidence for Pending.
+
+This supersedes the 0.2.8 rule that activity was informational only. Activity alone now supports Pending, but never Online, dataValid=true or a fault-free conclusion. Per-reading validity, error details and complete-success timestamps remain separate; retained old readings/detections do not qualify a new failed poll. No controller state, polling frequency, or optical probe behavior changes in this release.

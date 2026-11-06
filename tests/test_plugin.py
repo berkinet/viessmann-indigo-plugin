@@ -408,12 +408,34 @@ class AdapterTests(unittest.TestCase):
                                     optical_activity='Detected', optical_checked=True))
         system = self.devices[1]
         self.assertTrue(system.states['opticalActivityDetected'])
-        self.assertEqual(system.states['status'], 'Read failed')
+        self.assertEqual(system.states['status'], 'Pending')
         self.assertFalse(system.states['dataValid'])
         self.assertTrue(system.states['opticalActivityChecked'])
         self.plugin._publish(Result(tcp_available=True))
         self.assertFalse(system.states['opticalActivityDetected'])
         self.assertEqual(system.states['opticalActivity'], 'Unavailable')
+
+    def test_optical_activity_status_precedence_and_no_stale_pending(self):
+        for activity in ('Detected', 'Not detected', 'Unexpected byte', 'Unavailable', 'Disabled', 'Unsupported'):
+            with self.subTest(activity=activity):
+                self.plugin._publish(Result(errors={'boilerTemp': 'timeout'}, tcp_available=True,
+                                            optical_activity=activity, optical_checked=True))
+                expected = 'Pending' if activity == 'Detected' else 'Read failed'
+                for dev in self.devices.values():
+                    self.assertEqual(dev.states['status'], expected)
+                    self.assertEqual(dev.error, expected)
+                    self.assertFalse(dev.states['dataValid'])
+        # Valid data wins over an inconclusive optical check.
+        self.plugin._publish(Result(values=dict(zip(READS, (66, -3, 20, 46))),
+                                    tcp_available=True, optical_activity='Not detected'))
+        for dev in self.devices.values():
+            self.assertEqual(dev.states['status'], 'Online')
+            self.assertIsNone(dev.error)
+        # Earlier successful data and activity cannot survive a new failed cycle.
+        self.plugin._publish(Result(errors={'boilerTemp': 'Connection refused'}))
+        for dev in self.devices.values():
+            self.assertEqual(dev.states['status'], 'Connect failed')
+            self.assertFalse(dev.states['dataValid'])
 
     def test_connection_failure_is_distinct_from_read_failure(self):
         self.plugin._publish(Result(errors={'boilerTemp': 'Connection refused'}))
@@ -433,7 +455,7 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(heater.states['status'], 'Online')
         self.assertIsNone(heater.error)
 
-    def test_incomplete_shared_snapshot_is_pending_and_preserves_details(self):
+    def test_unrelated_read_does_not_make_missing_child_pending(self):
         self.plugin._publish(Result(values={'warmWaterTemp': 31.1},
                                     errors={'roomSetpoint': 'Invalid reading: ERR'},
                                     tcp_available=True))
@@ -442,8 +464,8 @@ class AdapterTests(unittest.TestCase):
         self.assertIsNone(system.error)
         self.assertFalse(system.states['dataValid'])
         self.assertIn('Invalid reading', system.states['lastError'])
-        self.assertEqual(heater.states['status'], 'Pending')
-        self.assertEqual(heater.error, 'Pending')
+        self.assertEqual(heater.states['status'], 'Read failed')
+        self.assertEqual(heater.error, 'Read failed')
         self.assertFalse(heater.states['dataValid'])
         self.assertIn('Invalid reading', heater.states['lastError'])
         dhw = self.devices[3]
