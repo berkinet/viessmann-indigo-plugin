@@ -1,0 +1,89 @@
+{
+  "bridge": {
+    "lines": 671,
+    "parsed_frames": 667,
+    "first": "2025-02-25 13:26:45.869",
+    "last": "2025-02-25 13:27:13.247",
+    "kinds": {
+      "0": 334,
+      "1": 333
+    },
+    "controls": {
+      "Vitoconnect->Optolink 04": 1,
+      "Optolink->Vitoconnect 05": 1,
+      "Optolink->Vitoconnect 06": 329,
+      "Optolink->Local 06": 5
+    },
+    "unparsed": [],
+    "matched_pairs": 333,
+    "unmatched_responses": [],
+    "pending_requests": [
+      {
+        "line": 671,
+        "time": "2025-02-25 13:27:13.247",
+        "src": "Vitoconnect",
+        "dst": "Optolink",
+        "kind": 0,
+        "func": 1,
+        "func_byte": 33,
+        "address": "2003",
+        "length": 1,
+        "data": ""
+      }
+    ],
+    "distinct_response_addresses": 298
+  },
+  "bridge_initialization_sequence": "04 / 05 / 160000 / 06; the analyzer prototype reported 160000 as non-frame, but it is expected initialization, not malformed data",
+  "workbook": [
+    {
+      "sheet": "Ruhe",
+      "frames": 620,
+      "kinds": {
+        "0": 310,
+        "1": 310
+      },
+      "functions": {
+        "1": 310
+      },
+      "pairs": 310,
+      "unmatched": [],
+      "pending": [],
+      "bad": [],
+      "distinct_addresses": 56
+    },
+    {
+      "sheet": "Import2",
+      "frames": 756,
+      "kinds": {
+        "0": 378,
+        "1": 378
+      },
+      "functions": {
+        "1": 377,
+        "2": 1
+      },
+      "pairs": 378,
+      "unmatched": [],
+      "pending": [],
+      "bad": [],
+      "distinct_addresses": 55
+    },
+    {
+      "sheet": "Import3",
+      "frames": 1084,
+      "kinds": {
+        "0": 542,
+        "1": 542
+      },
+      "functions": {
+        "1": 540,
+        "2": 2
+      },
+      "pairs": 542,
+      "unmatched": [],
+      "pending": [],
+      "bad": [],
+      "distinct_addresses": 62
+    }
+  ]
+}

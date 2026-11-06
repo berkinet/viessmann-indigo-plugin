@@ -20,3 +20,6 @@ Recording only our existing vcontrold requests will mainly reveal those same add
 A search result about unsolicited Collect traffic in [E3onCAN](https://github.com/MyHomeMyData/E3onCAN) concerns the newer E3 CAN interface, not evidence for broadcasts over this controller's Optolink interface. Similarly openHAB's network discovery broadcasts are not heater optical broadcasts.
 
 No hardware, Pi or heater access, code changes or installation were performed. Closer reviews of ViessData21, Optolink-Splitter and OptolinkDuoBlock remain a subsequent task; this report answers the preceding sniffer question.
+
+
+The subsequent [actual-capture analysis](public-capture-analysis.md) independently checks downloadable frames and distinguishes findings reproduced there from documentation-only examples.
