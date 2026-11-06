@@ -1,0 +1,28 @@
+other_entity,address,other_length,other_multiplier,other_signed,poll_group,other_writable,our_reads,our_lengths,our_conversions
+aussentemperatur,0800,2,0.1,True,OFTEN,False,getOutsideTemp,2,UT: short; V/10
+kesseltemperatur,0802,2,0.1,False,ALWAYS,False,getBoilerTemp,2,UT: short; V/10
+warmwassertemperatur,0804,2,0.1,False,ALWAYS,False,getWaterTemp,2,UT: short; V/10
+abgastemperatur,0808,2,0.1,False,OFTEN,False,getExhaustTemp,2,UT: short; V/10
+warmwassertemperatur_soll_akt,6500,2,0.1,False,SOMETIMES,False,NONE,,
+temperature_ambiante,0896,2,0.1,True,OFTEN,False,getProbeRoomTemp,2,UT: short; V/10
+vorlauftemperature_a1m1,0810,2,0.1,False,OFTEN,False,getProbeFlowA1,2,UT: short; V/10
+vorlaufsolltemperature_a1m1,2544,2,0.1,False,OFTEN,False,getTempVLsollM1,2,UT: short; V/10
+speichertemperature_tiefpass,0812,2,0.1,False,SOMETIMES,False,getProbeStorage,2,UT: short; V/10
+brennerleistung,A38F,1,0.5,False,OFTEN,False,NONE,,
+betriebsstunden,08A7,4,0.00027777778,False,SOMETIMES,False,getBurnerHours1,4,CS: uint; V/3600
+brennerstarts,088A,4,1,False,SOMETIMES,False,getBurnerStarts; getProbeStarts,2; 4,CO: int; V; raw hex
+brennerstoerung,0884,1,1,False,SOMETIMES,False,NONE,,
+status,A152,2,1,False,SOMETIMES,False,NONE,,
+speicherladepumpe,6513,1,1,False,OFTEN,False,NONE,,
+zirkulationspumpe,6515,2,1,False,SOMETIMES,False,NONE,,
+geraetekennung,00F8,8,raw/default,default,ONCEONLY,False,getDevType,2,"DT: enum; 20 53 01 2B=V200WB2 ID=2053 Protokoll:GWG_VBEM, 20 94=V200KW1 ID=2094 Protokoll:KW, 20 9F=V200KO2B ID=209F Protokoll:KW, 21 98=V200KW2 ID=2098 Protokoll:KW, 20 E3=Vitovalor ID=20E3 Protokoll:P300, *=UNKNOWN"
+betriebsart_2301_ro,2301,1,1,False,OFTEN,False,getCurrentMode,1,"BA: enum; 00=Warm-Water, 01=Reduced, 02=Normal, 03=Heating and Warm-Water, 04=Heating and Warm-Water, 05=Shut down, *=UNKNOWN"
+sparbetrieb_brut,2302,1,1,False,OFTEN,False,getSavingMode1,1,"RT: enum; 00=0, 01=1, *=UNKNOWN"
+partybetrieb_brut,2303,1,1,False,OFTEN,False,getPartyMode1,1,"RT: enum; 00=0, 01=1, *=UNKNOWN"
+zustand_1_stufe,0842,1,1,False,OFTEN,False,getProbeBurner1,1,raw hex
+neigung,27D3,1,0.1,False,ALWAYS,True,getProbeCurveSlope,1,raw hex
+niveau,27D4,1,1,True,ALWAYS,True,getProbeCurveLevel,1,raw hex
+temp_confort,2306,1,1,False,ALWAYS,True,getRoomTempSP,1,ST: char; V
+temp_reduite,2307,1,1,False,ALWAYS,True,getTempRaumRedSollM1,1,ST: char; V
+ecs_consigne,6300,1,1,False,ALWAYS,True,getTempWWsoll,1,ST: char; V
+betriebsart_mode,2323,1,1,False,ALWAYS,True,getProbeProgram,1,raw hex
