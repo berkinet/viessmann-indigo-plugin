@@ -24,6 +24,11 @@ class Plugin(indigo.PluginBase):
         dev.stateListOrDisplayStateIdChanged()
         self.events.put(('start', dev.id))
 
+    def getDeviceDisplayStateId(self, dev):
+        # Thermostat defaults may choose temperatureInputsAll, empty when no
+        # measured room input is available. Use the explicit health state.
+        return 'status'
+
     def deviceStopComm(self, dev):
         self.events.put(('stop', dev.id))
 
@@ -181,7 +186,7 @@ class Plugin(indigo.PluginBase):
                 failure = 'Read failed'
             updates = [{'key': 'simulator', 'value': result.simulator}, {'key': 'lastAttempt', 'value': stamp},
                        {'key': 'dataValid', 'value': valid},
-                       {'key': 'status', 'value': 'Current' if valid else failure},
+                       {'key': 'status', 'value': 'Online' if valid else failure},
                        {'key': 'lastError', 'value': '; '.join(errors)[:800]}]
             if dev.deviceTypeId == 'viessmannSystem':
                 updates.append({'key': 'tcpAvailable', 'value': result.tcp_available})

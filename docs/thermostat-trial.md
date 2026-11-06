@@ -52,3 +52,8 @@ The device status and Indigo error banner now say Connect failed when TCP connec
 ## 0.2.5: Pending for incomplete snapshots
 
 When TCP connects and the current shared poll returns some valid readings, devices missing their required data show Pending rather than Read failed. A child whose required reads succeeded remains Current. Connect failed still means TCP establishment failed; Read failed means no valid readings were obtained in the current poll. Retained values from previous polls do not count as current successes. Pending leaves dataValid false and preserves underlying failures in lastError, with per-reading validity and timestamps unchanged.
+
+
+## 0.2.6: explicit device display status
+
+Successful live snapshots now say Online instead of Current. getDeviceDisplayStateId explicitly selects status for all three device types, matching the intended XML selection, rather than allowing a thermostat's temperature display default to produce a blank column when no measured room input is available. Startup already calls stateListOrDisplayStateIdChanged, so existing devices are refreshed without recreation. Native thermostat temperature and setpoint fields remain separate. Simulator labels and Pending/Read failed/Connect failed are unchanged. The native UI result still requires owner confirmation after installation.

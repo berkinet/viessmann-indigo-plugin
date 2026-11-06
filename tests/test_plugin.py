@@ -341,6 +341,14 @@ class AdapterTests(unittest.TestCase):
             self.assertEqual(dev.states['status'], 'Read failed')
             self.assertEqual(dev.error, 'Read failed')
 
+    def test_live_heater_displays_online_without_a_measured_room_input(self):
+        self.plugin._publish(Result(values=dict(zip(READS, (66, -3, 20, 46))), tcp_available=True))
+        heater = self.devices[2]
+        self.assertEqual(heater.pluginProps['NumTemperatureInputs'], 0)
+        self.assertEqual(self.plugin.getDeviceDisplayStateId(heater), 'status')
+        self.assertEqual(heater.states['status'], 'Online')
+        self.assertIsNone(heater.error)
+
     def test_incomplete_shared_snapshot_is_pending_and_preserves_details(self):
         self.plugin._publish(Result(values={'warmWaterTemp': 31.1},
                                     errors={'roomSetpoint': 'Invalid reading: ERR'},
@@ -352,7 +360,7 @@ class AdapterTests(unittest.TestCase):
             self.assertFalse(dev.states['dataValid'])
             self.assertIn('Invalid reading', dev.states['lastError'])
         dhw = self.devices[3]
-        self.assertEqual(dhw.states['status'], 'Current')
+        self.assertEqual(dhw.states['status'], 'Online')
         self.assertTrue(dhw.states['dataValid'])
         self.assertEqual(dhw.states['warmWaterTemp'], 31.1)
         self.assertIsNone(dhw.error)
