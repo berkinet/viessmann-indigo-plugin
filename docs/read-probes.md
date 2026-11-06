@@ -61,3 +61,15 @@ RT is defined as enum bytes 00 -> text 0, 01 -> text 1, otherwise UNKNOWN. Those
 ## Fault probes with heater running — 6 November 2026
 
 The owner confirmed the heater was running and requested another check. Separate read-only sessions returned UNKNOWN for each of getStatusStoerung, getError0, and getError9. Each returned the daemon prompt normally and close confirmed release of the physical serial path. No writes or XML changes were made. Unlike the earlier timeout, these are undecoded responses; they do not establish active-fault polarity, absence of faults, or valid history records. A vcontrold prompt/UNKNOWN alone is not proof that a controller register was decoded successfully. Existing verified temperature reads remain the plugin's evidence for Online. Investigate raw response bytes and conversion/address applicability before adding fault-state behavior. The owner has not installed 0.2.6 and authorizes updating that release rather than incrementing for further pending implementation changes.
+
+## Immediate capture after owner-reported failure — 6 November 2026, 15:57 CET
+
+Repeated getStatusStoerung/getError0/getError9 and comparison getBoilerTemp. All fault queries again displayed UNKNOWN; temperature succeeded at 54.299999 C. Existing daemon debug logging proves real bytes were returned and exposes a conversion gap:
+
+| Query | Earlier running-state capture (14:56 UTC) | Failure capture (14:57 UTC) |
+| --- | --- | --- |
+| getStatusStoerung | FF | FF |
+| getError0 | D1 20 26 11 06 05 15 45 02 | D1 20 26 11 06 05 15 46 28 |
+| getError9 | D1 20 26 04 13 01 15 31 20 | D1 20 26 11 01 07 05 16 44 |
+
+Thus UNKNOWN here is not absence of controller communication: vcontrold receives bytes then converts them to UNKNOWN. History content changed, while status byte FF did not distinguish the two captures. The apparent D1 code and following date/time-shaped bytes require model-specific decoding verification; do not claim an active-fault meaning or date format yet. No XML changes or writes were issued. Preserve raw codes even when descriptions are unavailable in future fault decoding work.
