@@ -51,3 +51,9 @@ Metadata-only reload and a fresh-session command-catalogue check passed after re
 At the owner's request, addr1, addr2, code-check.out, command-list, and test-results were moved into /etc/vcontrold/archive/research/; test-xml.sh was moved into archive/scripts/. File contents, ownership and permission bits were verified unchanged. Both active symlinks and their selected configuration hashes were unchanged. No scripts were executed and no service reload was needed or performed.
 
 The /etc/vcontrold top level now contains only archive/, daemon-config/, xml/, and the active vito.xml and vcontrold.xml symlinks. Historical successful read output is preserved in archive/research/test-results for later investigation; it is not current telemetry.
+
+## Fault-status probe — 6 November 2026
+
+At the owner's request, queried the live endpoint with getStatusStoerung (XML address 7579, length 1, unit RT). The response was `ERR: read timeout`, followed by `Error in wait, terminating` and `Error executing getStatusStoerung`. A subsequent independent comparison read getBoilerTemp succeeded with 62.400002 C. Both sessions released Optolink with close. No writes were issued.
+
+RT is defined as enum bytes 00 -> text 0, 01 -> text 1, otherwise UNKNOWN. Those conversions alone do not establish fault polarity or prove this address is supported by this controller. This observation is a command failure while a normal temperature read works; it is not a returned boiler fault indication and must not be treated as either fault-free or fault-active. Leave the candidate outside required polling until address/applicability is investigated. Fault-history reads remain untested.
