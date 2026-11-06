@@ -73,3 +73,9 @@ Repeated getStatusStoerung/getError0/getError9 and comparison getBoilerTemp. All
 | getError9 | D1 20 26 04 13 01 15 31 20 | D1 20 26 11 01 07 05 16 44 |
 
 Thus UNKNOWN here is not absence of controller communication: vcontrold receives bytes then converts them to UNKNOWN. History content changed, while status byte FF did not distinguish the two captures. The apparent D1 code and following date/time-shaped bytes require model-specific decoding verification; do not claim an active-fault meaning or date format yet. No XML changes or writes were issued. Preserve raw codes even when descriptions are unavailable in future fault decoding work.
+
+## ES decoder restored — 6 November 2026
+
+Owner authorized restoring the saved ES unit. Replaced only that unit in /etc/vcontrold/daemon-config/vcontrold.xml with the ErrorState errstate block from vcontrold.xml.sav, including D1 -> Burner Fault. Original backup: /etc/vcontrold/daemon-config/vcontrold.xml.before-es-fix-20261106T150624Z. Live XML links and register definitions are unchanged; no boiler writes issued. Restart initially encountered a socket bind failure while an old client TCP session was closing; live service subsequently restarted and listened on port 3002.
+
+Post-restart getError0, getError9, getStatusStoerung and comparison getBoilerTemp all returned read timeout. Thus no live decoded history result was obtained during this check, and the failure was not limited to the new fault conversion. Do not claim the decoder has been live-verified or infer physical fault state from these timeouts. General fault status RT remains unchanged.
