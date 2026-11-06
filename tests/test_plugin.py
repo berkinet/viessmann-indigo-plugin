@@ -23,6 +23,7 @@ class FixtureServer(socketserver.ThreadingTCPServer):
         self.answers = answers or ['27.4 C', '0 C', '19.0', '-2.5 C']
         self.stall = stall
         self.close_reply = close_reply
+        self.activity_reply = 'Result: 05'
         self.identity = "V200KO2B (ID=209F) (Protocol=KW2)"
         owner = self
 
@@ -42,7 +43,18 @@ class FixtureServer(socketserver.ThreadingTCPServer):
                         if owner.stall:
                             time.sleep(1.2)
                             return
-                        if command == 'device':
+                        if command == 'raw':
+                            # A raw script is collected before execution, with no
+                            # intermediate vctrld prompt.
+                            for expected in ('RECV 1', 'END'):
+                                line = self.rfile.readline().decode().strip()
+                                owner.commands.append(line)
+                                if line != expected:
+                                    raise AssertionError(line)
+                            if owner.activity_reply is None:
+                                return  # vcontrold exits child on raw read timeout
+                            reply = owner.activity_reply + '\nvctrld> '
+                        elif command == 'device':
                             reply = owner.identity + '\nvctrld> '
                         elif command == 'close':
                             reply = (owner.close_reply or '/dev/test closed') + '\nvctrld> '
@@ -75,7 +87,67 @@ class TransportTests(unittest.TestCase):
                 self.assertFalse(result.errors)
                 self.assertFalse(result.release_error)
             self.assertEqual(server.connections, 1)
-            self.assertEqual(server.commands, (['device'] + list(READS.values()) + ['close']) * 2)
+            self.assertEqual(server.commands, (['device', 'raw', 'RECV 1', 'END'] + list(READS.values()) + ['close']) * 2)
+        finally:
+            client.disconnect(); server.stop()
+
+    def test_activity_is_independent_of_successful_register_reads(self):
+        server = FixtureServer(['UNKNOWN'] * 4)
+        client = Client(server.settings())
+        try:
+            result = client.poll()
+            self.assertEqual(result.optical_activity, 'Detected')
+            self.assertTrue(result.optical_checked)
+            self.assertFalse(result.values)
+            self.assertEqual(len(result.errors), 4)
+            self.assertFalse(any(c.startswith(('SEND', 'set')) for c in server.commands))
+        finally:
+            client.disconnect(); server.stop()
+
+    def test_silent_raw_disconnect_recovers_for_normal_reads(self):
+        server = FixtureServer()
+        server.activity_reply = None
+        client = Client(server.settings())
+        try:
+            result = client.poll()
+            self.assertEqual(result.optical_activity, 'Not detected')
+            self.assertIn('disconnected', result.optical_error)
+            self.assertTrue(result.values)
+            self.assertEqual(server.connections, 2)
+            self.assertEqual(server.commands[-1], 'close')
+        finally:
+            client.disconnect(); server.stop()
+
+    def test_unexpected_byte_and_protocol_gating(self):
+        server = FixtureServer()
+        client = Client(server.settings())
+        try:
+            server.activity_reply = 'Result: FF'
+            self.assertEqual(client.poll().optical_activity, 'Unexpected byte')
+            before = server.commands.count('raw')
+            server.identity = 'Other (ID=1234) (Protocol=P300)'
+            result = client.poll()
+            self.assertEqual(result.optical_activity, 'Unsupported')
+            self.assertFalse(result.optical_checked)
+            self.assertEqual(server.commands.count('raw'), before)
+        finally:
+            client.disconnect(); server.stop()
+
+    def test_cancelled_probe_sends_nothing_and_raw_is_not_a_general_command(self):
+        client = Client(Settings('localhost'))
+        result = Result()
+        with self.assertRaises(InterruptedError):
+            client._activity_probe(result, 'V200KO2B (ID=209F) (Protocol=KW2)', lambda: True)
+        self.assertFalse(result.optical_checked)
+        with self.assertRaises(ValueError):
+            client._exchange('raw', lambda: False)
+
+    def test_disabled_probe_does_not_send_raw(self):
+        server = FixtureServer()
+        client = Client(server.settings(activity_probe=False))
+        try:
+            self.assertEqual(client.poll().optical_activity, 'Disabled')
+            self.assertNotIn('raw', server.commands)
         finally:
             client.disconnect(); server.stop()
 
@@ -330,6 +402,18 @@ class AdapterTests(unittest.TestCase):
         self.plugin.actionControlUniversal(types.SimpleNamespace(deviceAction=1), self.devices[3])
         self.plugin._process_events()
         self.assertFalse(self.plugin.manager.requested)
+
+    def test_activity_detection_does_not_imply_valid_data_or_online(self):
+        self.plugin._publish(Result(errors={'boilerTemp': 'timeout'}, tcp_available=True,
+                                    optical_activity='Detected', optical_checked=True))
+        system = self.devices[1]
+        self.assertTrue(system.states['opticalActivityDetected'])
+        self.assertEqual(system.states['status'], 'Read failed')
+        self.assertFalse(system.states['dataValid'])
+        self.assertTrue(system.states['opticalActivityChecked'])
+        self.plugin._publish(Result(tcp_available=True))
+        self.assertFalse(system.states['opticalActivityDetected'])
+        self.assertEqual(system.states['opticalActivity'], 'Unavailable')
 
     def test_connection_failure_is_distinct_from_read_failure(self):
         self.plugin._publish(Result(errors={'boilerTemp': 'Connection refused'}))

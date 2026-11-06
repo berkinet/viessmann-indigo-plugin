@@ -7,6 +7,7 @@ The implementation provides three logical devices: **Viessmann system**, **Viess
 Native thermostat children are being trialled with simulator-only, readback-verified setpoint controls. Physical boiler writes remain blocked. The heater is currently out of service, so successful controller readings remain unverified. The owner confirmed that 0.1.0 starts in Indigo; 0.1.1 fixes its empty configuration dialog and awaits an owner UI check.
 
 - [Native thermostat trial and GitHub installation](docs/thermostat-trial.md)
+- [Receive-only optical activity check](docs/optical-activity.md)
 - [Read-only baseline behavior and tests](docs/runtime.md)
 - [Isolated simulator for UI/configuration testing](docs/simulator.md)
 - [Design context](docs/design.md)
@@ -15,7 +16,7 @@ Native thermostat children are being trialled with simulator-only, readback-veri
 - [Migration provenance and outstanding import gaps](docs/migration.md)
 - [Development instructions](AGENTS.md)
 
-Source bundle: `Viessmann.indigoPlugin` (development version 0.2.7).
+Source bundle: `Viessmann.indigoPlugin` (development version 0.2.8).
 
 ```zsh
 python3 -m unittest discover -s tests -v

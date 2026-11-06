@@ -39,3 +39,7 @@ Implementation baseline: persistent TCP owned by one manager; close releases Opt
 ## Distribution and thermostat trial
 
 The owner downloads installers from GitHub and performs installation. Publish versioned release assets; do not initiate local Indigo upgrades unless explicitly asked. Current prototype uses native thermostat children with selectable standard/normal, reduced, and party room targets. See docs/thermostat-trial.md. Physical writes remain blocked. Only the positively marked simulator may accept bounded setpoint commands with acknowledgement and readback; the marker must never be added to physical-controller configuration. Preserve the system device and its settings when migrating child classes.
+
+## Optical activity probe and repair hold
+
+The owner states the heater must stay off pending repair (reported 6 November 2026). Do not power it on or perform live controller tests until the owner explicitly resumes them. Offline source research, fixtures and simulator development remain authorized. See docs/optical-activity.md for the fixed receive-only raw script, KW/KW2 gating and interpretation limits. Optical activity, valid data communication and active fault status are separate observations. Boiler-temperature mapping on the heater was discussed but implementation was interrupted by the owner; it remains pending, not part of the optical probe release.

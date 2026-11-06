@@ -22,6 +22,10 @@
         <Label>Polling:</Label>
         <Description>Enable when ready to read the heater. No boiler writes.</Description>
       </Field>
+      <Field id="activityProbeEnabled" type="checkbox" defaultValue="true">
+        <Label>Optical activity:</Label>
+        <Description>Listen for one 0x05 byte before polling (KW/KW2 only). No detected byte does not prove power is off.</Description>
+      </Field>
       <Field id="SupportsStatusRequest" type="checkbox" defaultValue="true" hidden="true" />
     </ConfigUI>
     <States>
@@ -89,6 +93,26 @@
         <ValueType>Boolean</ValueType>
         <TriggerLabel>Simulator endpoint</TriggerLabel>
         <ControlPageLabel>Simulator endpoint</ControlPageLabel>
+      </State>
+      <State id="opticalActivity">
+        <ValueType>String</ValueType>
+        <TriggerLabel>Optical activity at last attempt</TriggerLabel>
+        <ControlPageLabel>Optical activity at last attempt</ControlPageLabel>
+      </State>
+      <State id="opticalActivityDetected">
+        <ValueType>Boolean</ValueType>
+        <TriggerLabel>0x05 detected at last attempt</TriggerLabel>
+        <ControlPageLabel>0x05 detected at last attempt</ControlPageLabel>
+      </State>
+      <State id="opticalActivityChecked">
+        <ValueType>String</ValueType>
+        <TriggerLabel>Optical activity last check (UTC)</TriggerLabel>
+        <ControlPageLabel>Optical activity last check (UTC)</ControlPageLabel>
+      </State>
+      <State id="opticalActivityError">
+        <ValueType>String</ValueType>
+        <TriggerLabel>Optical activity diagnostic</TriggerLabel>
+        <ControlPageLabel>Optical activity diagnostic</ControlPageLabel>
       </State>
     </States>
     <UiDisplayStateId>status</UiDisplayStateId>

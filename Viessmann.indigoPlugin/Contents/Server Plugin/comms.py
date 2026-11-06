@@ -34,6 +34,7 @@ class Settings:
     timeout: int = 12
     enabled: bool = False
     target: str = "standard"
+    activity_probe: bool = True
 
     def __post_init__(self):
         if self.target not in ('standard', 'reduced', 'party'):
@@ -53,6 +54,9 @@ class Result:
     tcp_available: bool = False
     release_error: str = ''
     simulator: bool = False
+    optical_activity: str = 'Unavailable'
+    optical_error: str = ''
+    optical_checked: bool = False
 
 
 class Client:
@@ -98,6 +102,44 @@ class Client:
         self.sock.sendall((command + '\n').encode('ascii'))
         return self._frame(cancelled)
 
+    def _activity_probe(self, result, identity, cancelled):
+        if not self.settings.activity_probe:
+            result.optical_activity = 'Disabled'
+            return
+        # P300 framing can transmit on open/close. Restrict passive raw access
+        # to our known unframed KW protocols, never arbitrary user raw commands.
+        if not identity.endswith(('(Protocol=KW)', '(Protocol=KW2)')):
+            result.optical_activity = 'Unsupported'
+            return
+        if cancelled():
+            raise InterruptedError('Polling cancelled')
+        result.optical_checked = True
+        try:
+            self.sock.settimeout(self.settings.timeout)
+            self.sock.sendall(b'raw\nRECV 1\nEND\n')
+            reply = self._frame(cancelled)
+            if re.fullmatch(r'Result: +05', reply):
+                result.optical_activity = 'Detected'
+            elif re.fullmatch(r'Result: +[0-9A-Fa-f]{2}', reply):
+                result.optical_activity = 'Unexpected byte'
+                result.optical_error = reply
+            else:
+                result.optical_activity = 'Not detected'
+                result.optical_error = reply[:400] or 'No byte returned by receive-only probe'
+        except (OSError, ValueError, UnicodeError) as exc:
+            # Raw RECV exits the vcontrold child on receive timeout. A missing
+            # Result is not proof of power-off; keep the actual diagnostic.
+            result.optical_activity = 'Not detected'
+            result.optical_error = str(exc)
+            self.disconnect()
+            if cancelled():
+                raise InterruptedError('Polling cancelled')
+            # Never reuse an ambiguous raw-mode stream. Normal polling gets
+            # a fresh TCP session, still owned by this same serial manager.
+            self.sock = socket.create_connection(
+                (self.settings.host, self.settings.port), min(5, self.settings.timeout))
+            self._frame(cancelled)
+
     def poll(self, cancelled=lambda: False):
         result = Result()
         try:
@@ -109,7 +151,9 @@ class Client:
             result.tcp_available = True
             try:
                 try:
-                    result.simulator = self._exchange('device', cancelled) == SIMULATOR_ID
+                    identity = self._exchange('device', cancelled)
+                    result.simulator = identity == SIMULATOR_ID
+                    self._activity_probe(result, identity, cancelled)
                 except (OSError, ValueError, UnicodeError):
                     self.disconnect()
                     raise

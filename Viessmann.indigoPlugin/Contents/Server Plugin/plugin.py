@@ -111,7 +111,8 @@ class Plugin(indigo.PluginBase):
     def settings(props):
         return Settings(str(props.get('host', '')).strip(), int(props.get('port', 3002)),
                         int(props.get('pollInterval', 180)), int(props.get('timeout', 12)),
-                        props.get('pollingEnabled', False) in (True, 'true', 'True'))
+                        props.get('pollingEnabled', False) in (True, 'true', 'True'),
+                        activity_probe=props.get('activityProbeEnabled', True) in (True, 'true', 'True'))
 
     def validateDeviceConfigUi(self, valuesDict, typeId, devId):
         errors = indigo.Dict()
@@ -153,7 +154,10 @@ class Plugin(indigo.PluginBase):
         updates = [{'key': 'dataValid', 'value': False}, {'key': 'status', 'value': reason}]
         updates.extend({'key': key + 'Valid', 'value': False} for key in self._keys(dev))
         if dev.deviceTypeId == 'viessmannSystem':
-            updates.append({'key': 'tcpAvailable', 'value': False})
+            updates.extend([{'key': 'tcpAvailable', 'value': False},
+                            {'key': 'opticalActivity', 'value': 'Unavailable'},
+                            {'key': 'opticalActivityDetected', 'value': False},
+                            {'key': 'opticalActivityError', 'value': reason}])
         dev.updateStatesOnServer(updates)
         dev.setErrorStateOnServer(reason)
 
@@ -191,7 +195,12 @@ class Plugin(indigo.PluginBase):
                        {'key': 'status', 'value': 'Online' if online else failure},
                        {'key': 'lastError', 'value': '; '.join(errors)[:800]}]
             if dev.deviceTypeId == 'viessmannSystem':
-                updates.append({'key': 'tcpAvailable', 'value': result.tcp_available})
+                updates.extend([{'key': 'tcpAvailable', 'value': result.tcp_available},
+                                {'key': 'opticalActivity', 'value': result.optical_activity},
+                                {'key': 'opticalActivityDetected', 'value': result.optical_activity == 'Detected'},
+                                {'key': 'opticalActivityError', 'value': result.optical_error}])
+                if result.optical_checked:
+                    updates.append({'key': 'opticalActivityChecked', 'value': stamp})
             for key in keys:
                 updates.append({'key': key + 'Valid', 'value': key in result.values})
                 if key in result.values:
