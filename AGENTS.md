@@ -43,3 +43,7 @@ The owner downloads installers from GitHub and performs installation. Publish ve
 ## Optical activity probe and repair hold
 
 The owner states the heater must stay off pending repair (reported 6 November 2026). Do not power it on or perform live controller tests until the owner explicitly resumes them. Offline source research, fixtures and simulator development remain authorized. See docs/optical-activity.md for the fixed receive-only raw script, KW/KW2 gating and interpretation limits. Optical activity, valid data communication and active fault status are separate observations. Boiler-temperature mapping on the heater was discussed but implementation was interrupted by the owner; it remains pending, not part of the optical probe release.
+
+## Nameplate-confirmed controller identity
+
+On 8 November 2026 the owner supplied a photograph identifying the installed controller as **Viessmann Vitotronic 200, type KO2B**. Use KO2B for model-specific research; earlier KO1B/KO2B wording describes the broader family. This is the controller identification, not evidence of the boiler/burner model, firmware revision or supported protocol commands. Source image: `/Users/rdp/Desktop/Screenshots/Screenshot 2026-11-08 at 14.01.46.png`.

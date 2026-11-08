@@ -1,6 +1,6 @@
 # Viessmann Indigo plugin
 
-Development prototype for an Indigo plugin using a Raspberry Pi running vcontrold on TCP port 3002 and Optolink to a Vitotronic 200 KO1B/KO2B.
+Development prototype for an Indigo plugin using a Raspberry Pi running vcontrold on TCP port 3002 and Optolink to a **Viessmann Vitotronic 200, type KO2B** (confirmed from the controller nameplate supplied by the owner on 8 November 2026). Earlier KO1B/KO2B references describe the controller family; the installed controller is KO2B.
 
 The implementation provides three logical devices: **Viessmann system**, **Viessmann heater**, and **Viessmann water heater**. One shared manager owns a persistent TCP connection, polls shared readings, and releases the optical link between cycles. The system's polling interval defaults to 180 seconds and is configurable. Polling is disabled by default.
 
