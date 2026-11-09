@@ -90,3 +90,9 @@ sudo systemctl enable --now vcontrold-test.service
 ```
 
 Verify the process and listener with `pgrep -a vcontrold` and `sudo ss -ltnp`. The legacy SysV wrapper can report active even when its daemon failed, so service state alone is insufficient. Live identity metadata returned V200KO2B (ID=209F) (Protocol=KW2), not SIMULATOR_209F. This verifies the configured endpoint, not successful heater telemetry. No boiler reads or writes were issued for this switch; only daemon metadata and close were requested. Indigo's endpoint stays unchanged. Simulator-only write gating remains in place.
+
+## Return to simulation — 9 November 2026
+
+The owner requested simulator testing while the physical heater remains out of service. Stopped and disabled `vcontrol.service`; verified no live vcontrold process or port-3002 listener remained before starting the simulator. Enabled and started `vcontrold-simulator.service` and `vcontrold-test.service`. The frontend remains `192.168.5.37:3002`, backend `127.0.0.1:6578`, with the existing PrivateDevices isolation. Production XML and device settings were not changed.
+
+Two consecutive polls through `tools/simulator/check.py` confirmed simulator identity, successful release and expected synthetic values: boiler 66 °C, outside -3 °C, standard room target 20 °C, DHW 46 °C; additional simulator values included measured room 20.7 °C and DHW target 50 °C. Indigo endpoint settings need no change. Indigo device states were not independently inspected because the connector returned an availability error; automatic UI refresh depends on polling being enabled. The live-service restoration commands above remain applicable after explicit owner authorization.
