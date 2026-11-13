@@ -262,7 +262,10 @@ class Plugin(indigo.PluginBase):
                                 and (target == 'standard' or dev.deviceTypeId == 'viessmannWaterHeater'))
                 writable = (not provisional and (result.simulator or live_allowed)
                             and valid and target_key in result.values)
-                self._native_capabilities(dev, result.simulator, writable)
+                # Intermediate readings must not toggle capability properties: Indigo
+                # may restart device communications when these properties change.
+                if not provisional:
+                    self._native_capabilities(dev, result.simulator, writable)
                 if dev.deviceTypeId == 'viessmannHeater':
                     updates.append({'key': 'selectedTarget', 'value': target.title()})
                     if result.simulator and 'roomMeasuredTemp' in result.values:

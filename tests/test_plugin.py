@@ -442,7 +442,7 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(published, {2})
         self.assertEqual(self.devices[2].states['temperatureInput1'], 66)
         self.assertEqual(self.devices[2].states['status'], 'Online')
-        self.assertFalse(self.devices[2].pluginProps['SupportsHeatSetpoint'])
+        self.assertFalse(self.devices[2].pluginProps.get('SupportsHeatSetpoint', False))
         result.values['warmWaterTemp'] = 46
         self.plugin._publish_progress(result, published)
         self.assertEqual(published, {2, 3})
@@ -450,6 +450,35 @@ class AdapterTests(unittest.TestCase):
         result.release_error = 'close failed'
         self.plugin._publish(result)
         self.assertIn('close failed', self.devices[2].states['lastError'])
+
+    def test_early_readings_do_not_toggle_writable_capabilities_between_polls(self):
+        self.plugin.pluginPrefs['liveWritesEnabled'] = True
+        values = dict(zip(READS, (42, 10, 20, 52.9)))
+        values['dhwSetpoint'] = 54
+        full = Result(values=values, tcp_available=True, live_identity=True)
+        self.plugin._publish(full)
+        changes = []
+        for ident in (2, 3):
+            dev = self.devices[ident]
+            original = dev.replacePluginPropsOnServer
+            def replace(props, ident=ident, original=original):
+                changes.append(ident)
+                original(props)
+                # Model Indigo restarting communications on a property change.
+                self.plugin.deviceStopComm(self.devices[ident])
+                self.plugin.deviceStartComm(self.devices[ident])
+            dev.replacePluginPropsOnServer = replace
+        for _ in range(3):
+            partial = Result(values={'boilerTemp': 42, 'roomSetpoint': 20,
+                                     'warmWaterTemp': 52.9}, tcp_available=True, live_identity=True)
+            self.plugin._publish_progress(partial, set())
+            self.plugin._publish(full)
+            self.plugin._process_events()
+        self.assertEqual(changes, [])
+        for ident in (2, 3):
+            self.assertTrue(self.devices[ident].pluginProps['SupportsHeatSetpoint'])
+            self.assertEqual(self.devices[ident].states['status'], 'Online')
+            self.assertTrue(self.devices[ident].states['dataValid'])
 
     def test_live_preference_controls_capabilities_and_revokes_queued_actions(self):
         self.devices[1].pluginProps['pollingEnabled'] = True

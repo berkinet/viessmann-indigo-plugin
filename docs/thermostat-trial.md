@@ -94,3 +94,11 @@ At the owner's request, 0.2.13 was republished before download. Enabled polling 
 Within a cycle, each child publishes once its own required readings are available, without waiting for unrelated later commands or optical release. Simulator children also wait for their synthetic measured/target inputs. Early publications do not enable setpoint controls. The final snapshot still publishes errors/release diagnostics and computes write capability under the complete-snapshot gate. Results are suppressed if device/configuration events arrive or shutdown begins.
 
 Added regression coverage for retry bounds, successful-startup exit, normal cadence after later failures, reset on configuration change, progress callbacks before later reads/close, and early child publication followed by final error reporting. All 33 tests passed. Saving the live-write preference already schedules a fresh poll; a plugin restart is not required.
+
+## Capability oscillation fix — 0.2.14
+
+Owner's 13 November screenshot showed current DHW temperature 52.9 C and target 54 C, actionStatus Live readback confirmed, but dataValid/temperature validity false and status Awaiting polling. This is consistent with our partial-publish bug: provisional snapshots forced SupportsHeatSetpoint false and final complete snapshots restored true. Indigo property updates can restart device communications, clearing validity and scheduling another poll; the next partial snapshot repeated the toggle.
+
+Provisional publication now updates readings without changing native capability properties. Only final snapshots determine capability changes. This retains early temperature display and avoids manufacturing a capability change every cycle. Existing action authorization and fresh pre-write checks still apply even when native arrows remain visible during an intermediate update. A genuine capability change may still cause one device refresh.
+
+Regression coverage models capability-property changes triggering stop/start callbacks and checks repeated partial/final cycles produce no property changes, no validity clearing and no Awaiting polling reset. All 34 offline tests passed. The screenshot also provides owner-side evidence of a later successful live DHW write/readback, superseding the earlier failed validation for that observed action only.
