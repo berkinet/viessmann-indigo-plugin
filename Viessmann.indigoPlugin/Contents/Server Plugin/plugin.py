@@ -304,7 +304,7 @@ class Plugin(indigo.PluginBase):
                     for child_id in self.active:
                         child = self._device(child_id)
                         if child is not None and str(child.pluginProps.get('systemId', '')) == str(device_id):
-                            self._unavailable(child, 'System restarting')
+                            self._unavailable(child, 'Plugin restarted')
             else:
                 self.active.discard(device_id)
                 if dev is not None:
@@ -358,7 +358,7 @@ class Plugin(indigo.PluginBase):
         for dev in devices:
             if dev.id != system.id and str(dev.pluginProps.get('systemId', '')) != str(system.id):
                 self._unavailable(dev, 'Parent system unavailable')
-            elif not settings.enabled and (changed or self.unavailable.get(dev.id) in ('Awaiting polling', 'System restarting')):
+            elif not settings.enabled and (changed or self.unavailable.get(dev.id) in ('Awaiting polling', 'Plugin restarted')):
                 self._unavailable(dev, 'Polling disabled')
 
     def runConcurrentThread(self):
