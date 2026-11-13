@@ -255,6 +255,20 @@ class TransportTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             client._exchange('setTempWWsoll 50', lambda: False)
 
+    def test_progress_callback_runs_before_later_reads_and_close(self):
+        server = FixtureServer()
+        client = Client(server.settings())
+        seen = []
+        try:
+            result = client.poll(on_progress=lambda partial: seen.append((set(partial.values), list(server.commands))))
+            self.assertEqual(len(seen), 4)
+            self.assertEqual(seen[0][0], {'boilerTemp'})
+            self.assertNotIn('getOutsideTemp', seen[0][1])
+            self.assertTrue(all('close' not in commands for _, commands in seen))
+            self.assertFalse(result.release_error)
+        finally:
+            client.disconnect(); server.stop()
+
     def test_cancellation_closes_session(self):
         server = FixtureServer()
         client = Client(server.settings())
@@ -275,7 +289,7 @@ class SchedulingTests(unittest.TestCase):
             def __init__(self, settings):
                 self.calls = 0; self.closed = False; instances.append(self)
             def poll(self, cancelled):
-                self.calls += 1; clock[0] += 20; return Result()
+                self.calls += 1; clock[0] += 20; return Result(values=dict.fromkeys(READS, 20))
             def disconnect(self): self.closed = True
         manager = Manager(clock=lambda: clock[0], client_factory=Fake)
         manager.configure(Settings('localhost'))
@@ -294,6 +308,31 @@ class SchedulingTests(unittest.TestCase):
         manager.close()
         self.assertTrue(instances[-1].closed)
 
+
+    def test_startup_retries_are_bounded_and_stop_after_complete_snapshot(self):
+        clock = [0]
+        class Fake:
+            def __init__(self, settings): self.good = False
+            def poll(self, cancelled):
+                clock[0] += 2
+                return Result(values=dict.fromkeys(READS, 20)) if self.good else Result()
+            def disconnect(self): pass
+        manager = Manager(clock=lambda: clock[0], client_factory=Fake)
+        manager.configure(Settings('localhost', enabled=True))
+        for attempt in range(4):
+            self.assertIsNotNone(manager.tick())
+            self.assertEqual(manager.due, clock[0] + (5 if attempt < 3 else 180))
+            clock[0] = manager.due
+        manager.client.good = True
+        manager.tick()
+        self.assertTrue(manager.startup_complete)
+        clock[0] = manager.due
+        manager.client.good = False
+        manager.tick()
+        self.assertEqual(manager.due, clock[0] + 180)
+        manager.configure(Settings('other-host', enabled=True))
+        manager.tick()
+        self.assertEqual(manager.due, clock[0] + 5)
 
     def test_manual_poll_coalesces_without_enabling_periodic_polling(self):
         calls = []
@@ -392,6 +431,25 @@ class AdapterTests(unittest.TestCase):
         self.plugin._publish(Result(values=dict(zip(READS, (66, -3, 16, 46))), tcp_available=True))
         self.assertFalse(heater.pluginProps['SupportsHeatSetpoint'])
         self.assertEqual(heater.pluginProps['NumTemperatureInputs'], 1)
+
+    def test_child_progress_publishes_once_before_final_release_without_controls(self):
+        published = set()
+        result = Result(values={'boilerTemp': 66}, tcp_available=True)
+        self.plugin._publish_progress(result, published)
+        self.assertFalse(published)
+        result.values['roomSetpoint'] = 20
+        self.plugin._publish_progress(result, published)
+        self.assertEqual(published, {2})
+        self.assertEqual(self.devices[2].states['temperatureInput1'], 66)
+        self.assertEqual(self.devices[2].states['status'], 'Online')
+        self.assertFalse(self.devices[2].pluginProps['SupportsHeatSetpoint'])
+        result.values['warmWaterTemp'] = 46
+        self.plugin._publish_progress(result, published)
+        self.assertEqual(published, {2, 3})
+        self.assertEqual(self.devices[3].states['temperatureInput1'], 46)
+        result.release_error = 'close failed'
+        self.plugin._publish(result)
+        self.assertIn('close failed', self.devices[2].states['lastError'])
 
     def test_live_preference_controls_capabilities_and_revokes_queued_actions(self):
         self.devices[1].pluginProps['pollingEnabled'] = True

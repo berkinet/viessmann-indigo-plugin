@@ -146,7 +146,7 @@ class Client:
                 (self.settings.host, self.settings.port), min(5, self.settings.timeout))
             self._frame(cancelled)
 
-    def poll(self, cancelled=lambda: False):
+    def poll(self, cancelled=lambda: False, on_progress=None):
         result = Result()
         try:
             if self.sock is None:
@@ -179,6 +179,8 @@ class Client:
                         raise
                     try:
                         result.values[key] = temperature(response)
+                        if on_progress is not None:
+                            on_progress(result)
                     except ValueError as exc:
                         result.errors[key] = str(exc)
             finally:
@@ -256,27 +258,41 @@ class Manager:
         self.client = None
         self.due = 0
         self.requested = False
+        self.startup_failures = 0
+        self.startup_complete = False
 
     def configure(self, settings):
         if settings != self.settings:
             self.close()
             self.settings = settings
+            self.startup_failures = 0
+            self.startup_complete = False
             self.due = self.clock()
 
     def request_poll(self):
         # Called only by the worker; repeated queued refresh requests coalesce.
         self.requested = True
 
-    def tick(self, cancelled=lambda: False):
+    def tick(self, cancelled=lambda: False, on_progress=None):
         if (self.settings is None or cancelled()
                 or (not self.requested and (not self.settings.enabled or self.clock() < self.due))):
             return None
         if self.client is None:
             self.client = self.client_factory(self.settings)
         self.requested = False
-        result = self.client.poll(cancelled)
-        # No overlapping cycles or catch-up burst if a cycle takes longer than expected.
-        self.due = self.clock() + self.settings.interval
+        result = (self.client.poll(cancelled) if on_progress is None
+                  else self.client.poll(cancelled, on_progress))
+        complete = (set(READS).issubset(result.values) and not result.errors
+                    and not result.release_error)
+        delay = self.settings.interval
+        if complete:
+            self.startup_complete = True
+        elif not self.startup_complete:
+            self.startup_failures += 1
+            if self.settings.enabled and self.startup_failures <= 3:
+                delay = 5
+        # Delays start after completion: never overlap or retry setters.
+        self.due = self.clock() + delay
         return result
 
     def write_setpoint(self, target, value, cancelled=lambda: False):

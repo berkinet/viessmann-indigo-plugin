@@ -183,9 +183,30 @@ class Plugin(indigo.PluginBase):
             return 'Pending'
         return 'System Off'
 
-    def _publish(self, result):
+    def _publish_progress(self, result, published):
+        if self.closing.is_set() or not self.events.empty():
+            return
+        ready = set()
+        for ident in self.active - published:
+            dev = self._device(ident)
+            if dev is None or dev.deviceTypeId == 'viessmannSystem':
+                continue
+            if str(dev.pluginProps.get('systemId', '')) != str(self.system_id):
+                continue
+            required = set(self._keys(dev))
+            if result.simulator:
+                required.add('roomMeasuredTemp' if dev.deviceTypeId == 'viessmannHeater' else 'dhwSetpoint')
+            if required <= set(result.values):
+                ready.add(ident)
+        if ready:
+            self._publish(result, device_ids=ready, provisional=True)
+            published.update(ready)
+
+    def _publish(self, result, device_ids=None, provisional=False):
         stamp = datetime.now(timezone.utc).isoformat(timespec='seconds')
         for device_id in list(self.active):
+            if device_ids is not None and device_id not in device_ids:
+                continue
             dev = self._device(device_id)
             if dev is None:
                 continue
@@ -239,7 +260,8 @@ class Plugin(indigo.PluginBase):
                                 and not result.errors and not result.release_error
                                 and (set(('boilerTemp', 'outsideTemp', 'roomSetpoint', 'warmWaterTemp', 'dhwSetpoint')) <= set(result.values))
                                 and (target == 'standard' or dev.deviceTypeId == 'viessmannWaterHeater'))
-                writable = (result.simulator or live_allowed) and valid and target_key in result.values
+                writable = (not provisional and (result.simulator or live_allowed)
+                            and valid and target_key in result.values)
                 self._native_capabilities(dev, result.simulator, writable)
                 if dev.deviceTypeId == 'viessmannHeater':
                     updates.append({'key': 'selectedTarget', 'value': target.title()})
@@ -366,7 +388,9 @@ class Plugin(indigo.PluginBase):
             while not self.closing.is_set():
                 self._process_events()
                 self._configure()
-                result = self.manager.tick(self.closing.is_set)
+                published = set()
+                result = self.manager.tick(self.closing.is_set,
+                                           lambda partial: self._publish_progress(partial, published))
                 if result is not None and not self.closing.is_set():
                     # Discard results if Indigo stopped/reconfigured a device mid-poll.
                     if self.events.empty():
