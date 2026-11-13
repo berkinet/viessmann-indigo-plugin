@@ -17,6 +17,7 @@ class Plugin(indigo.PluginBase):
         self.pending_sets = {}
         self.pending_lock = threading.RLock()
         self.established_fault = ''
+        self.state_images = {}
 
     def closedPrefsConfigUi(self, valuesDict, userCancelled):
         if not userCancelled:
@@ -33,7 +34,24 @@ class Plugin(indigo.PluginBase):
             props['SupportsStatusRequest'] = True
             dev.replacePluginPropsOnServer(props)
         dev.stateListOrDisplayStateIdChanged()
+        self._update_state_icon(dev)
         self.events.put(('start', dev.id))
+
+    def _update_state_icon(self, dev, updates=()):
+        states = dict(dev.states)
+        states.update({item['key']: item['value'] for item in updates})
+        if dev.deviceTypeId != 'viessmannSystem':
+            selector = indigo.kStateImageSel.TemperatureSensor
+        elif str(states.get('status', '')).startswith(('Error ', 'SIMULATOR · Error ')):
+            selector = indigo.kStateImageSel.SensorTripped
+        elif not states.get('burnerStatusValid', False) or not states.get('healthValid', False):
+            selector = indigo.kStateImageSel.SensorOff
+        else:
+            selector = (indigo.kStateImageSel.HvacHeating if states.get('burnerActive', False)
+                        else indigo.kStateImageSel.HvacOff)
+        if self.state_images.get(dev.id) != selector:
+            dev.updateStateImageOnServer(selector)
+            self.state_images[dev.id] = selector
 
     def getDeviceDisplayStateId(self, dev):
         return 'status' if dev.deviceTypeId == 'viessmannSystem' else 'temperatureInputsAll'
@@ -110,6 +128,7 @@ class Plugin(indigo.PluginBase):
                 display_error = 'Pending set confirmation'
             dev.updateStatesOnServer(updates)
             dev.setErrorStateOnServer(display_error)
+            self._update_state_icon(dev, updates)
 
     def actionControlThermostat(self, action, dev):
         kinds = {indigo.kThermostatAction.SetHeatSetpoint: 'set',
@@ -212,7 +231,9 @@ class Plugin(indigo.PluginBase):
         updates = [{'key': 'dataValid', 'value': False}, {'key': 'status', 'value': reason}]
         updates.extend({'key': key + 'Valid', 'value': False} for key in self._keys(dev))
         if dev.deviceTypeId == 'viessmannSystem':
-            updates.extend([{'key': 'tcpAvailable', 'value': False},
+            updates.extend([{'key': 'burnerOutputValid', 'value': False},
+                            {'key': 'burnerStatusValid', 'value': False},
+                            {'key': 'tcpAvailable', 'value': False},
                             {'key': 'opticalActivity', 'value': 'Unavailable'},
                             {'key': 'opticalActivityDetected', 'value': False},
                             {'key': 'opticalActivityError', 'value': reason}])
@@ -271,7 +292,23 @@ class Plugin(indigo.PluginBase):
             updates.extend([{'key': 'opticalActivity', 'value': result.optical_activity},
                             {'key': 'opticalActivityDetected', 'value': result.optical_activity == 'Detected'},
                             {'key': 'opticalActivityError', 'value': result.optical_error}])
+        if not result.health_ok:
+            updates.extend([{'key': 'burnerStatusValid', 'value': False},
+                            {'key': 'burnerOutputValid', 'value': False}])
         if result.fault_only:
+            updates.extend([{'key': 'burnerOutputValid', 'value': result.burner_output is not None},
+                            {'key': 'burnerOutputError', 'value': result.burner_output_error}])
+            if result.burner_output_raw:
+                updates.append({'key': 'burnerOutputRaw', 'value': result.burner_output_raw})
+            if result.burner_output is not None:
+                updates.extend([{'key': 'burnerOutput', 'value': result.burner_output},
+                                {'key': 'burnerOutputUpdated', 'value': result.burner_output_checked}])
+            burner_valid = result.burner_status in ('00', '01')
+            updates.append({'key': 'burnerStatusValid', 'value': burner_valid})
+            if burner_valid:
+                updates.extend([{'key': 'burnerActive', 'value': result.burner_status == '01'},
+                                {'key': 'burnerStatusRaw', 'value': result.burner_status},
+                                {'key': 'burnerStatusUpdated', 'value': result.burner_checked}])
             interpretation = ('Active (provisional relay bit)' if result.verified_active_fault_code
                               else 'Clear (provisional relay bit)') if result.active_fault_known else 'Unknown (last state retained)'
             updates.extend([{'key': 'faultCheckError', 'value': result.fault_error},

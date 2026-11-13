@@ -37,6 +37,17 @@
       <Field id="SupportsStatusRequest" type="checkbox" defaultValue="true" hidden="true" />
     </ConfigUI>
     <States>
+      <State id="burnerOutput"><ValueType>Number</ValueType><TriggerLabel>Burner output (%) — provisional</TriggerLabel><ControlPageLabel>Burner output (%) — provisional</ControlPageLabel></State>
+      <State id="burnerOutputValid"><ValueType>Boolean</ValueType><TriggerLabel>Burner output reading valid</TriggerLabel><ControlPageLabel>Burner output reading valid</ControlPageLabel></State>
+      <State id="burnerOutputUpdated"><ValueType>String</ValueType><TriggerLabel>Burner output last success (UTC)</TriggerLabel><ControlPageLabel>Burner output last success (UTC)</ControlPageLabel></State>
+      <State id="burnerOutputRaw"><ValueType>String</ValueType><TriggerLabel>Burner output raw daemon response</TriggerLabel><ControlPageLabel>Burner output raw daemon response</ControlPageLabel></State>
+      <State id="burnerOutputError"><ValueType>String</ValueType><TriggerLabel>Burner output read error</TriggerLabel><ControlPageLabel>Burner output read error</ControlPageLabel></State>
+
+      <State id="burnerActive"><ValueType>Boolean</ValueType><TriggerLabel>Burner stage-1 output active (provisional)</TriggerLabel><ControlPageLabel>Burner stage-1 output active (provisional)</ControlPageLabel></State>
+      <State id="burnerStatusValid"><ValueType>Boolean</ValueType><TriggerLabel>Burner activity reading valid</TriggerLabel><ControlPageLabel>Burner activity reading valid</ControlPageLabel></State>
+      <State id="burnerStatusRaw"><ValueType>String</ValueType><TriggerLabel>Raw burner activity</TriggerLabel><ControlPageLabel>Raw burner activity</ControlPageLabel></State>
+      <State id="burnerStatusUpdated"><ValueType>String</ValueType><TriggerLabel>Burner activity last success (UTC)</TriggerLabel><ControlPageLabel>Burner activity last success (UTC)</ControlPageLabel></State>
+
       <State id="lastRecordedError"><ValueType>String</ValueType><TriggerLabel>Last recorded error (history)</TriggerLabel><ControlPageLabel>Last recorded error (history)</ControlPageLabel></State>
       <State id="relayStatusRaw"><ValueType>String</ValueType><TriggerLabel>Raw relay status</TriggerLabel><ControlPageLabel>Raw relay status</ControlPageLabel></State>
       <State id="lastFaultCheck"><ValueType>String</ValueType><TriggerLabel>Last fault sample (UTC)</TriggerLabel><ControlPageLabel>Last fault sample (UTC)</ControlPageLabel></State>

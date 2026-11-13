@@ -78,6 +78,12 @@ class Result:
     relay_status: str = ''
     fault_checked: str = ''
     fault_error: str = ''
+    burner_status: str = ''
+    burner_checked: str = ''
+    burner_output: float | None = None
+    burner_output_raw: str = ''
+    burner_output_checked: str = ''
+    burner_output_error: str = ''
 
 
 class Client:
@@ -122,7 +128,7 @@ class Client:
         return frame.decode('ascii').strip()
 
     def _exchange(self, command, cancelled):
-        allowed = set(READS.values()) | {v[0] for v in TARGETS.values()} | {'getProbeRoomTemp', 'getSystemTime', 'getError0', 'getProbeRelayStatus', 'device', 'close'}
+        allowed = set(READS.values()) | {v[0] for v in TARGETS.values()} | {'getProbeRoomTemp', 'getSystemTime', 'getError0', 'getProbeRelayStatus', 'getProbeBurner1', 'getBurnerOutput', 'device', 'close'}
         if command not in allowed:
             raise ValueError('Command is not an allowed read or link release')
         self.sock.settimeout(self.settings.timeout)
@@ -220,7 +226,7 @@ class Client:
             self.disconnect()
             return result
         errors = []
-        for command, attribute in [('getError0', 'fault_record'), ('getProbeRelayStatus', 'relay_status')]:
+        for command, attribute in [('getError0', 'fault_record'), ('getProbeRelayStatus', 'relay_status'), ('getProbeBurner1', 'burner_status'), ('getBurnerOutput', 'burner_output')]:
             try:
                 text = self._exchange(command, cancelled)
             except (OSError, ValueError, UnicodeError) as exc:
@@ -228,6 +234,8 @@ class Client:
                 self.disconnect()
                 break
             try:
+                if attribute == 'burner_output':
+                    result.burner_output_raw = text
                 if not text or 'ERR' in text or 'UNKNOWN' in text or 'Error executing' in text:
                     raise ValueError('Fault sampling failed: ' + text[:160])
                 if attribute == 'relay_status':
@@ -235,11 +243,23 @@ class Client:
                         raise ValueError('Invalid relay status: ' + text[:160])
                     if bytes.fromhex(text) == b'\x05\x05':
                         raise ValueError('Suspect synchronization bytes in relay status: 05 05')
+                elif attribute == 'burner_status':
+                    if text not in ('00', '01'):
+                        raise ValueError('Invalid burner activity: ' + text[:160])
+                    result.burner_checked = datetime.now(timezone.utc).isoformat(timespec='seconds')
+                elif attribute == 'burner_output':
+                    match = re.fullmatch(r'([+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+))(?:[ \t]*%)?', text)
+                    if not match or not 0 <= float(match.group(1)) <= 100:
+                        raise ValueError('Invalid burner output: ' + text[:160])
+                    text = float(match.group(1))
+                    result.burner_output_checked = datetime.now(timezone.utc).isoformat(timespec='seconds')
                 elif not re.search(r'\([0-9A-Fa-f]{2}\)$', text):
                     raise ValueError('Invalid error history: ' + text[:160])
                 setattr(result, attribute, text)
             except ValueError as exc:
                 errors.append(str(exc))
+                if attribute == 'burner_output':
+                    result.burner_output_error = str(exc)
         result.fault_error = '; '.join(errors)
         if result.relay_status and (result.live_identity or result.simulator):
             # Provisional mapping observed across D1 and owner-confirmed recovery.

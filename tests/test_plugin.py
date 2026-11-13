@@ -30,6 +30,8 @@ class FixtureServer(socketserver.ThreadingTCPServer):
         self.activity_reply = 'Result: 05'
         self.clock_reply = '2026-11-13T14:37:23+0000'
         self.targets = {'getRoomTempSP': '19', 'getTempWWsoll': '50'}
+        self.output_reply = '37.5 %'
+        self.burner_reply = '01'
         self.relay_reply = '83 80'
         self.error_reply = '2026-11-13T14:30:08+0000 Burner Fault (D1)'
         self.setter_reply = 'OK'
@@ -64,6 +66,10 @@ class FixtureServer(socketserver.ThreadingTCPServer):
                             if owner.activity_reply is None:
                                 return  # vcontrold exits child on raw read timeout
                             reply = owner.activity_reply + '\nvctrld> '
+                        elif command == 'getBurnerOutput':
+                            reply = owner.output_reply + '\nvctrld> '
+                        elif command == 'getProbeBurner1':
+                            reply = owner.burner_reply + '\nvctrld> '
                         elif command == 'getError0':
                             reply = owner.error_reply + '\nvctrld> '
                         elif command == 'getProbeRelayStatus':
@@ -253,6 +259,12 @@ class TransportTests(unittest.TestCase):
             self.assertTrue(result.health_ok)
             self.assertIn('(D1)', result.fault_record)
             self.assertEqual(result.relay_status, '83 80')
+            self.assertEqual(result.burner_status, '01')
+            server.burner_reply = '05'
+            bad_burner = client.fault()
+            self.assertFalse(bad_burner.burner_status)
+            self.assertIn('burner activity', bad_burner.fault_error)
+            server.burner_reply = '01'
             self.assertEqual(result.verified_active_fault_code, 'D1')
             self.assertTrue(result.active_fault_known)
             server.relay_reply = '82 80'
@@ -272,6 +284,22 @@ class TransportTests(unittest.TestCase):
             server.identity = 'Other (ID=1234) (Protocol=KW2)'
             self.assertFalse(client.fault().active_fault_known)
             self.assertNotIn('close', server.commands)
+        finally:
+            client.disconnect(); server.stop()
+
+    def test_output_percentage_accepts_zero_and_rejects_errors_without_losing_relay(self):
+        server = FixtureServer()
+        client = Client(server.settings())
+        try:
+            self.assertEqual(client.fault().burner_output, 37.5)
+            server.output_reply = '0 %'
+            self.assertEqual(client.fault().burner_output, 0)
+            for reply in ('UNKNOWN', 'ERR: read 5 failed', '101 %', '-1', 'nan', '5 C'):
+                server.output_reply = reply
+                result = client.fault()
+                self.assertIsNone(result.burner_output)
+                self.assertTrue(result.burner_output_error)
+                self.assertTrue(result.active_fault_known)
         finally:
             client.disconnect(); server.stop()
 
@@ -458,6 +486,7 @@ class Device:
     def updateStatesOnServer(self, updates):
         self.states.update({u['key']: u['value'] for u in updates})
     def setErrorStateOnServer(self, error): self.error = error
+    def updateStateImageOnServer(self, selector): self.icon = selector
     def stateListOrDisplayStateIdChanged(self): pass
     def replacePluginPropsOnServer(self, props): self.pluginProps = dict(props)
 
@@ -471,6 +500,7 @@ class AdapterTests(unittest.TestCase):
         stub = types.ModuleType('indigo')
         class Base:
             def __init__(self, ident, *args): self.pluginId = ident; self.pluginPrefs = dict(args[-1])
+        stub.kStateImageSel = types.SimpleNamespace(TemperatureSensor='temp', SensorTripped='fault', SensorOff='unknown', HvacHeating='heating', HvacOff='idle')
         stub.PluginBase = Base; stub.Dict = dict; stub.devices = Devices()
         stub.kUniversalAction = types.SimpleNamespace(RequestStatus=1)
         stub.kThermostatAction = types.SimpleNamespace(SetHeatSetpoint=1, IncreaseHeatSetpoint=2, DecreaseHeatSetpoint=3)
@@ -529,6 +559,47 @@ class AdapterTests(unittest.TestCase):
         self.plugin._publish(Result(values=readings(66, -3, 16, 46), tcp_available=True))
         self.assertFalse(heater.pluginProps['SupportsHeatSetpoint'])
         self.assertEqual(heater.pluginProps['NumTemperatureInputs'], 1)
+
+    def test_icon_uses_pending_updates_and_output_failure_retains_value(self):
+        dev = self.devices[1]
+        before = dict(dev.states)
+        self.plugin._update_state_icon(dev, [
+            {'key': 'healthValid', 'value': True}, {'key': 'burnerStatusValid', 'value': True},
+            {'key': 'burnerActive', 'value': True}, {'key': 'status', 'value': 'Online'}])
+        self.assertEqual(dev.icon, 'heating')
+        self.assertEqual(dev.states, before)
+        self.plugin._publish(Result(health_only=True, fault_only=True, health_ok=True, tcp_available=True,
+                                    burner_status='00', burner_output=0, burner_output_raw='0 %',
+                                    burner_output_checked='2026-11-13T15:00:00+00:00'))
+        self.assertEqual(dev.states['burnerOutput'], 0)
+        self.assertTrue(dev.states['burnerOutputValid'])
+        self.assertEqual(dev.icon, 'idle')
+        self.plugin._publish(Result(health_only=True, fault_only=True, health_ok=True, tcp_available=True,
+                                    burner_status='00', burner_output_error='read failed'))
+        self.assertEqual(dev.states['burnerOutput'], 0)
+        self.assertFalse(dev.states['burnerOutputValid'])
+        self.assertEqual(dev.icon, 'idle')
+
+    def test_child_icons_are_fixed_and_system_activity_is_separate_from_fault(self):
+        self.assertEqual(self.devices[2].icon, 'temp')
+        self.assertEqual(self.devices[3].icon, 'temp')
+        active = Result(health_only=True, fault_only=True, tcp_available=True, health_ok=True,
+                        active_fault_known=True, burner_status='01', burner_checked='2026-11-13T15:00:00+00:00')
+        self.plugin._publish(active)
+        self.assertEqual(self.devices[1].icon, 'heating')
+        self.plugin._publish(Result(health_only=True, tcp_available=True, health_ok=True))
+        self.assertEqual(self.devices[1].icon, 'heating')
+        self.plugin._publish(Result(health_only=True, fault_only=True, tcp_available=True, health_ok=True,
+                                    active_fault_known=True, burner_status='00'))
+        self.assertEqual(self.devices[1].icon, 'idle')
+        self.plugin._publish(Result(health_only=True, fault_only=True, tcp_available=True, health_ok=True,
+                                    active_fault_known=True, verified_active_fault_code='D1', burner_status='01'))
+        self.assertEqual(self.devices[1].icon, 'fault')
+        self.plugin._publish(Result(health_only=True, fault_only=True, tcp_available=True, health_ok=True,
+                                    active_fault_known=True, fault_error='bad burner byte'))
+        self.assertEqual(self.devices[1].icon, 'unknown')
+        self.assertEqual(self.devices[2].icon, 'temp')
+        self.assertEqual(self.devices[3].icon, 'temp')
 
     def test_relay_trial_display_changes_without_affecting_child_controls(self):
         self.plugin._publish(Result(values=readings(42, 10, 20, 52.9), tcp_available=True))
