@@ -42,7 +42,7 @@ The owner downloads installers from GitHub and performs installation. Publish ve
 
 ## Optical activity probe and repair hold
 
-The owner states the heater must stay off pending repair (reported 6 November 2026). Do not power it on or perform live controller tests until the owner explicitly resumes them. Offline source research, fixtures and simulator development remain authorized. See docs/optical-activity.md for the fixed receive-only raw script, KW/KW2 gating and interpretation limits. Optical activity, valid data communication and active fault status are separate observations. Boiler-temperature mapping on the heater was discussed but implementation was interrupted by the owner; it remains pending, not part of the optical probe release.
+The owner states the heater must stay off pending repair (reported 6 November 2026). Do not power it on or perform live controller tests until the owner explicitly resumes them. Offline source research, fixtures and simulator development remain authorized. See docs/optical-activity.md for the fixed receive-only raw script, KW/KW2 gating and interpretation limits. Optical activity, valid data communication and active fault status are separate observations. Boiler-temperature mapping was deferred during the optical probe release and implemented in 0.2.11 after the owner reported the live blank display; see docs/thermostat-trial.md. The owner explicitly resumed production communications on 13 November and subsequently reported the heater running.
 
 ## Nameplate-confirmed controller identity
 

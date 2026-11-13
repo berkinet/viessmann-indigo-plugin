@@ -124,7 +124,7 @@
         <Label>Viessmann system:</Label>
         <List class="self" method="getSystems" />
       </Field>
-      <Field id="NumTemperatureInputs" type="textfield" defaultValue="0" hidden="true" />
+      <Field id="NumTemperatureInputs" type="textfield" defaultValue="1" hidden="true" />
       <Field id="NumHumidityInputs" type="textfield" defaultValue="0" hidden="true" />
       <Field id="SupportsHeatSetpoint" type="checkbox" defaultValue="false" hidden="true" />
       <Field id="SupportsCoolSetpoint" type="checkbox" defaultValue="false" hidden="true" />
@@ -145,6 +145,22 @@
       <Field id="SupportsStatusRequest" type="checkbox" defaultValue="true" hidden="true" />
     </ConfigUI>
     <States>
+      <State id="boilerTemp">
+        <ValueType>Number</ValueType>
+        <TriggerLabel>Boiler temperature (C)</TriggerLabel>
+        <ControlPageLabel>Boiler temperature (C)</ControlPageLabel>
+      </State>
+      <State id="boilerTempValid">
+        <ValueType>Boolean</ValueType>
+        <TriggerLabel>Boiler temperature valid</TriggerLabel>
+        <ControlPageLabel>Boiler temperature valid</ControlPageLabel>
+      </State>
+      <State id="boilerTempUpdated">
+        <ValueType>String</ValueType>
+        <TriggerLabel>Boiler temperature last success (UTC)</TriggerLabel>
+        <ControlPageLabel>Boiler temperature last success (UTC)</ControlPageLabel>
+      </State>
+
       <State id="dataValid">
         <ValueType>Boolean</ValueType>
         <TriggerLabel>Data valid</TriggerLabel>
@@ -201,7 +217,7 @@
         <ControlPageLabel>Selected room target</ControlPageLabel>
       </State>
     </States>
-    <UiDisplayStateId>status</UiDisplayStateId>
+    <UiDisplayStateId>temperatureInputsAll</UiDisplayStateId>
   </Device>
   <Device id="viessmannWaterHeater" type="thermostat">
     <Name>Viessmann water heater</Name>
@@ -279,6 +295,6 @@
         <ControlPageLabel>DHW target (C)</ControlPageLabel>
       </State>
     </States>
-    <UiDisplayStateId>status</UiDisplayStateId>
+    <UiDisplayStateId>temperatureInputsAll</UiDisplayStateId>
   </Device>
 </Devices>

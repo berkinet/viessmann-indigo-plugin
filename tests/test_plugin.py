@@ -352,7 +352,7 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(self.plugin.manager.settings.target, 'reduced')
         self.plugin._publish(Result(values=dict(zip(READS, (66, -3, 16, 46))), tcp_available=True))
         self.assertFalse(heater.pluginProps['SupportsHeatSetpoint'])
-        self.assertEqual(heater.pluginProps['NumTemperatureInputs'], 0)
+        self.assertEqual(heater.pluginProps['NumTemperatureInputs'], 1)
 
     def test_queued_target_change_rejects_write_and_relative_actions_use_readback(self):
         self.devices[1].pluginProps['pollingEnabled'] = True
@@ -473,13 +473,28 @@ class AdapterTests(unittest.TestCase):
             self.assertEqual(dev.states['status'], 'System Off' if dev.id == 1 else 'Read failed')
             self.assertEqual(dev.error, 'System Off' if dev.id == 1 else 'Read failed')
 
-    def test_live_heater_status_and_requested_display_id_without_measured_input(self):
+    def test_live_heater_uses_boiler_temperature_with_writes_disabled(self):
         self.plugin._publish(Result(values=dict(zip(READS, (66, -3, 20, 46))), tcp_available=True))
         heater = self.devices[2]
-        self.assertEqual(heater.pluginProps['NumTemperatureInputs'], 0)
-        self.assertEqual(self.plugin.getDeviceDisplayStateId(heater), 'status')
+        self.assertEqual(heater.pluginProps['NumTemperatureInputs'], 1)
+        self.assertEqual(self.plugin.getDeviceDisplayStateId(heater), 'temperatureInputsAll')
+        self.assertEqual(heater.states['temperatureInput1'], 66)
+        self.assertEqual(heater.states['boilerTemp'], 66)
+        self.assertTrue(heater.states['boilerTempValid'])
+        self.assertFalse(heater.pluginProps['SupportsHeatSetpoint'])
         self.assertEqual(heater.states['status'], 'Online')
         self.assertIsNone(heater.error)
+
+
+    def test_missing_boiler_read_retains_temperature_but_invalidates_heater(self):
+        self.plugin._publish(Result(values=dict(zip(READS, (66, -3, 20, 46))), tcp_available=True))
+        self.plugin._publish(Result(values={'roomSetpoint': 21}, errors={'boilerTemp': 'timeout'},
+                                    tcp_available=True, optical_activity='Detected'))
+        heater = self.devices[2]
+        self.assertEqual(heater.states['temperatureInput1'], 66)
+        self.assertFalse(heater.states['boilerTempValid'])
+        self.assertFalse(heater.states['dataValid'])
+        self.assertEqual(heater.states['status'], 'Pending')
 
     def test_unrelated_read_does_not_make_missing_child_pending(self):
         self.plugin._publish(Result(values={'warmWaterTemp': 31.1},

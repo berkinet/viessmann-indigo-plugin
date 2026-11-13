@@ -25,16 +25,14 @@ class Plugin(indigo.PluginBase):
         self.events.put(('start', dev.id))
 
     def getDeviceDisplayStateId(self, dev):
-        # Thermostat defaults may choose temperatureInputsAll, empty when no
-        # measured room input is available. Use the explicit health state.
-        return 'status'
+        return 'status' if dev.deviceTypeId == 'viessmannSystem' else 'temperatureInputsAll'
 
     def deviceStopComm(self, dev):
         self.events.put(('stop', dev.id))
 
     def _native_capabilities(self, dev, simulator, writable):
         props = dict(dev.pluginProps)
-        values = {'NumTemperatureInputs': 1 if simulator or dev.deviceTypeId == 'viessmannWaterHeater' else 0,
+        values = {'NumTemperatureInputs': 1,
                   'NumHumidityInputs': 0, 'SupportsHeatSetpoint': writable,
                   'SupportsCoolSetpoint': False, 'SupportsHvacOperationMode': False,
                   'SupportsHvacFanMode': False, 'ShowCoolHeatEquipmentStateUI': False}
@@ -144,7 +142,7 @@ class Plugin(indigo.PluginBase):
     @staticmethod
     def _keys(dev):
         return {'viessmannSystem': ('boilerTemp', 'outsideTemp'),
-                'viessmannHeater': ('roomSetpoint',),
+                'viessmannHeater': ('roomSetpoint', 'boilerTemp'),
                 'viessmannWaterHeater': ('warmWaterTemp',)}[dev.deviceTypeId]
 
     def _unavailable(self, dev, reason):
@@ -232,6 +230,9 @@ class Plugin(indigo.PluginBase):
                     updates.append({'key': 'selectedTarget', 'value': target.title()})
                     if result.simulator and 'roomMeasuredTemp' in result.values:
                         updates.append({'key': 'temperatureInput1', 'value': result.values['roomMeasuredTemp']})
+                    elif not result.simulator and 'boilerTemp' in result.values:
+                        # Provisional live display: boiler temperature, never a room target.
+                        updates.append({'key': 'temperatureInput1', 'value': result.values['boilerTemp']})
                 elif 'warmWaterTemp' in result.values:
                     updates.append({'key': 'temperatureInput1', 'value': result.values['warmWaterTemp']})
                 if writable:
