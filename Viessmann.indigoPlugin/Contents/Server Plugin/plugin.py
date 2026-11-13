@@ -14,6 +14,9 @@ class Plugin(indigo.PluginBase):
         self.active = set()
         self.system_id = None
         self.unavailable = {}
+        self.pending_sets = {}
+        self.pending_lock = threading.RLock()
+        self.established_fault = ''
 
     def closedPrefsConfigUi(self, valuesDict, userCancelled):
         if not userCancelled:
@@ -72,6 +75,42 @@ class Plugin(indigo.PluginBase):
         if action.deviceAction == indigo.kUniversalAction.RequestStatus:
             self.events.put(('refresh', dev.id))
 
+    def _begin_set(self, dev):
+        with self.pending_lock:
+            pending = self.pending_sets.setdefault(dev.id, {
+                'count': 0, 'status': dev.states.get('status', 'Awaiting polling'),
+                'error': None if dev.states.get('dataValid', False) else dev.states.get('status')})
+            pending['count'] += 1
+            dev.updateStatesOnServer([{'key': 'status', 'value': 'Pending set confirmation'},
+                                      {'key': 'actionStatus', 'value': 'Pending set confirmation'}])
+            # Native thermostat list displays honor the device message override.
+            dev.setErrorStateOnServer('Pending set confirmation')
+
+    def _finish_set(self, dev):
+        with self.pending_lock:
+            pending = self.pending_sets.get(dev.id)
+            if not pending:
+                return
+            pending['count'] -= 1
+            if pending['count']:
+                return
+            del self.pending_sets[dev.id]
+            dev.updateStatesOnServer([{'key': 'status', 'value': pending['status']}])
+            dev.setErrorStateOnServer(pending['error'])
+
+    def _publish_states(self, dev, updates, display_error):
+        with self.pending_lock:
+            pending = self.pending_sets.get(dev.id)
+            if pending:
+                for update in updates:
+                    if update['key'] == 'status':
+                        pending['status'] = update['value']
+                        update['value'] = 'Pending set confirmation'
+                pending['error'] = display_error
+                display_error = 'Pending set confirmation'
+            dev.updateStatesOnServer(updates)
+            dev.setErrorStateOnServer(display_error)
+
     def actionControlThermostat(self, action, dev):
         kinds = {indigo.kThermostatAction.SetHeatSetpoint: 'set',
                  indigo.kThermostatAction.IncreaseHeatSetpoint: 'increase',
@@ -81,12 +120,18 @@ class Plugin(indigo.PluginBase):
             self.logger.error('Unsupported thermostat action')
             return
         target = dev.pluginProps.get('roomTarget', 'standard') if dev.deviceTypeId == 'viessmannHeater' else 'dhw'
+        self._begin_set(dev)
         self.events.put(('write', (dev.id, target, kind, action.actionValue, self.manager.settings)))
 
     def _write(self, request):
         device_id, target, kind, requested, original_settings = request
         dev = self._device(device_id)
         if dev is None or device_id not in self.active:
+            if dev is not None:
+                self._finish_set(dev)
+            else:
+                with self.pending_lock:
+                    self.pending_sets.pop(device_id, None)
             return
         try:
             if original_settings is None or original_settings != self.manager.settings:
@@ -111,6 +156,8 @@ class Plugin(indigo.PluginBase):
         except (OSError, ValueError, KeyError, TypeError) as exc:
             dev.updateStatesOnServer([{'key': 'actionStatus', 'value': str(exc)}])
             self.logger.warning('Thermostat action rejected/failed: %s', exc)
+        finally:
+            self._finish_set(dev)
 
     def getSystems(self, filter='', valuesDict=None, typeId='', targetId=0):
         return [(str(d.id), d.name) for d in indigo.devices.iter(self.pluginId)
@@ -121,7 +168,9 @@ class Plugin(indigo.PluginBase):
         return Settings(str(props.get('host', '')).strip(), int(props.get('port', 3002)),
                         int(props.get('pollInterval', 180)), int(props.get('timeout', 12)),
                         props.get('pollingEnabled', False) in (True, 'true', 'True'),
-                        activity_probe=props.get('activityProbeEnabled', True) in (True, 'true', 'True'))
+                        activity_probe=props.get('activityProbeEnabled', True) in (True, 'true', 'True'),
+                        health_interval=int(props.get('healthInterval', 30)),
+                        fault_interval=int(props.get('faultInterval', 60)))
 
     def validateDeviceConfigUi(self, valuesDict, typeId, devId):
         errors = indigo.Dict()
@@ -129,7 +178,7 @@ class Plugin(indigo.PluginBase):
             try:
                 self.settings(valuesDict)
             except (ValueError, TypeError) as exc:
-                errors['showAlertText'] = str(exc) + '. Port: 1–65535; interval: 30–86400; timeout: 1–60 seconds.'
+                errors['showAlertText'] = str(exc) + '. Port: 1–65535; interval: 30–86400; timeout: 1–60; health/fault checks: 10–86400 seconds.'
             if any(d.id != devId and d.deviceTypeId == typeId
                    for d in indigo.devices.iter(self.pluginId)):
                 errors['host'] = 'Use the existing system; this version supports one boiler.'
@@ -153,7 +202,7 @@ class Plugin(indigo.PluginBase):
     @staticmethod
     def _keys(dev):
         return {'viessmannSystem': ('boilerTemp', 'outsideTemp'),
-                'viessmannHeater': ('roomSetpoint', 'boilerTemp'),
+                'viessmannHeater': ('roomSetpoint', 'roomMeasuredTemp'),
                 'viessmannWaterHeater': ('warmWaterTemp',)}[dev.deviceTypeId]
 
     def _unavailable(self, dev, reason):
@@ -167,21 +216,73 @@ class Plugin(indigo.PluginBase):
                             {'key': 'opticalActivity', 'value': 'Unavailable'},
                             {'key': 'opticalActivityDetected', 'value': False},
                             {'key': 'opticalActivityError', 'value': reason}])
-        dev.updateStatesOnServer(updates)
-        dev.setErrorStateOnServer(reason)
+        self._publish_states(dev, updates, reason)
 
     @staticmethod
     def _system_status(result):
         if not result.tcp_available:
             return 'Comm Fail'
-        responding = bool(result.values) or result.optical_activity == 'Detected'
+        responding = result.health_ok or bool(result.values) or result.optical_activity == 'Detected'
         if responding and result.verified_active_fault_code:
-            return 'Error ' + result.verified_active_fault_code
-        if result.values:
+            return ('Error (code unavailable)' if result.verified_active_fault_code == 'Unknown'
+                    else 'Error ' + result.verified_active_fault_code)
+        if result.health_ok or result.values:
             return 'Online'
         if result.optical_activity == 'Detected':
             return 'Pending'
         return 'System Off'
+
+    def _health_updates(self, result):
+        updates = [{'key': 'healthValid', 'value': result.health_ok},
+                   {'key': 'healthError', 'value': result.health_error}]
+        if result.health_checked:
+            updates.append({'key': 'lastHealthCheck', 'value': result.health_checked})
+        if result.system_time:
+            updates.append({'key': 'controllerTime', 'value': result.system_time})
+        return updates
+
+    @staticmethod
+    def _clock_success_updates(dev, result):
+        if not result.health_ok or not result.health_checked:
+            return []
+        previous = dev.states.get('lastSuccess', '')
+        try:
+            if previous and datetime.fromisoformat(previous) >= datetime.fromisoformat(result.health_checked):
+                return []
+        except (ValueError, TypeError):
+            pass
+        return [{'key': 'lastSuccess', 'value': result.health_checked}]
+
+    def _publish_health(self, result):
+        dev = self._device(self.system_id)
+        if dev is None:
+            return
+        if result.active_fault_known or result.verified_active_fault_code:
+            self.established_fault = result.verified_active_fault_code
+        if result.health_ok and self.established_fault:
+            result.verified_active_fault_code = self.established_fault
+        status = self._system_status(result)
+        if result.simulator:
+            status = 'SIMULATOR · ' + status
+        updates = self._health_updates(result) + self._clock_success_updates(dev, result) + [
+            {'key': 'status', 'value': status},
+            {'key': 'tcpAvailable', 'value': result.tcp_available}]
+        if result.optical_checked:
+            updates.extend([{'key': 'opticalActivity', 'value': result.optical_activity},
+                            {'key': 'opticalActivityDetected', 'value': result.optical_activity == 'Detected'},
+                            {'key': 'opticalActivityError', 'value': result.optical_error}])
+        if result.fault_only:
+            interpretation = ('Active (provisional relay bit)' if result.verified_active_fault_code
+                              else 'Clear (provisional relay bit)') if result.active_fault_known else 'Unknown (last state retained)'
+            updates.extend([{'key': 'faultCheckError', 'value': result.fault_error},
+                            {'key': 'faultStatus', 'value': interpretation}])
+            if result.fault_record:
+                updates.append({'key': 'lastRecordedError', 'value': result.fault_record})
+            if result.relay_status:
+                updates.append({'key': 'relayStatusRaw', 'value': result.relay_status})
+            if result.fault_checked:
+                updates.append({'key': 'lastFaultCheck', 'value': result.fault_checked})
+        self._publish_states(dev, updates, None if self._system_status(result) == 'Online' else self._system_status(result))
 
     def _publish_progress(self, result, published):
         if self.closing.is_set() or not self.events.empty():
@@ -203,6 +304,13 @@ class Plugin(indigo.PluginBase):
             published.update(ready)
 
     def _publish(self, result, device_ids=None, provisional=False):
+        if result.health_only:
+            self._publish_health(result)
+            return
+        if not provisional and (result.active_fault_known or result.verified_active_fault_code):
+            self.established_fault = result.verified_active_fault_code
+        if self.established_fault:
+            result.verified_active_fault_code = self.established_fault
         stamp = datetime.now(timezone.utc).isoformat(timespec='seconds')
         for device_id in list(self.active):
             if device_ids is not None and device_id not in device_ids:
@@ -240,25 +348,27 @@ class Plugin(indigo.PluginBase):
                        {'key': 'status', 'value': status},
                        {'key': 'lastError', 'value': '; '.join(errors)[:800]}]
             if dev.deviceTypeId == 'viessmannSystem':
+                updates.extend(self._health_updates(result))
                 updates.extend([{'key': 'tcpAvailable', 'value': result.tcp_available},
                                 {'key': 'opticalActivity', 'value': result.optical_activity},
                                 {'key': 'opticalActivityDetected', 'value': result.optical_activity == 'Detected'},
                                 {'key': 'opticalActivityError', 'value': result.optical_error}])
                 if result.optical_checked:
                     updates.append({'key': 'opticalActivityChecked', 'value': stamp})
-            for key in keys:
+            reading_keys = keys + (('boilerTemp',) if dev.deviceTypeId == 'viessmannHeater' else ())
+            for key in reading_keys:
                 updates.append({'key': key + 'Valid', 'value': key in result.values})
                 if key in result.values:
                     updates.extend([{'key': key, 'value': result.values[key]},
                                     {'key': key + 'Updated', 'value': stamp}])
             if valid:
                 updates.append({'key': 'lastSuccess', 'value': stamp})
+            elif dev.deviceTypeId == 'viessmannSystem':
+                updates.extend(self._clock_success_updates(dev, result))
             if dev.deviceTypeId != 'viessmannSystem':
                 target = dev.pluginProps.get('roomTarget', 'standard')
                 target_key = 'roomSetpoint' if dev.deviceTypeId == 'viessmannHeater' else 'dhwSetpoint'
-                live_allowed = (self._live_writes_enabled() and result.live_identity
-                                and not result.errors and not result.release_error
-                                and (set(('boilerTemp', 'outsideTemp', 'roomSetpoint', 'warmWaterTemp', 'dhwSetpoint')) <= set(result.values))
+                live_allowed = (self._live_writes_enabled() and result.live_identity and result.health_ok
                                 and (target == 'standard' or dev.deviceTypeId == 'viessmannWaterHeater'))
                 writable = (not provisional and (result.simulator or live_allowed)
                             and valid and target_key in result.values)
@@ -268,11 +378,9 @@ class Plugin(indigo.PluginBase):
                     self._native_capabilities(dev, result.simulator, writable)
                 if dev.deviceTypeId == 'viessmannHeater':
                     updates.append({'key': 'selectedTarget', 'value': target.title()})
-                    if result.simulator and 'roomMeasuredTemp' in result.values:
+                    if 'roomMeasuredTemp' in result.values:
                         updates.append({'key': 'temperatureInput1', 'value': result.values['roomMeasuredTemp']})
-                    elif not result.simulator and 'boilerTemp' in result.values:
-                        # Provisional live display: boiler temperature, never a room target.
-                        updates.append({'key': 'temperatureInput1', 'value': result.values['boilerTemp']})
+
                 elif 'warmWaterTemp' in result.values:
                     updates.append({'key': 'temperatureInput1', 'value': result.values['warmWaterTemp']})
                 if writable:
@@ -289,8 +397,7 @@ class Plugin(indigo.PluginBase):
                             update['value'] = label + ' · ' + status
                         elif online:
                             update['value'] = label
-            dev.updateStatesOnServer(updates)
-            dev.setErrorStateOnServer(display_error)
+            self._publish_states(dev, updates, display_error)
 
     def _process_events(self):
         while True:
@@ -403,6 +510,8 @@ class Plugin(indigo.PluginBase):
             pass
         finally:
             self.manager.close()
+            with self.pending_lock:
+                self.pending_sets.clear()
             for device_id in list(self.active):
                 dev = self._device(device_id)
                 if dev is not None:

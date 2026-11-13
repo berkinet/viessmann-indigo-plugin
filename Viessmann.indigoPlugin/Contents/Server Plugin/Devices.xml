@@ -14,21 +14,40 @@
         <Label>Polling interval (seconds):</Label>
         <Description>30–86400 seconds after each cycle completes.</Description>
       </Field>
+      <Field id="healthInterval" type="textfield" defaultValue="30">
+        <Label>Controller health-check interval (seconds):</Label>
+        <Description>10–86400 seconds. Reads the controller clock independently of full data polling.</Description>
+      </Field>
+      <Field id="faultInterval" type="textfield" defaultValue="60">
+        <Label>Error/status sampling interval (seconds):</Label>
+        <Description>10–86400 seconds. Samples error history and the provisional KO2B relay fault bit. History is retained after clearing; suspect replies do not clear the last fault.</Description>
+      </Field>
       <Field id="timeout" type="textfield" defaultValue="12">
         <Label>Response timeout (seconds):</Label>
         <Description>1–60 seconds per command.</Description>
       </Field>
       <Field id="pollingEnabled" type="checkbox" defaultValue="false">
         <Label>Polling:</Label>
-        <Description>Enable when ready to read the heater. No boiler writes.</Description>
+        <Description>Enable periodic readings and controller health checks. Live writes require separate plugin opt-in.</Description>
       </Field>
       <Field id="activityProbeEnabled" type="checkbox" defaultValue="true">
         <Label>Optical activity:</Label>
-        <Description>Listen for one 0x05 byte before polling (KW/KW2 only). No detected byte does not prove power is off.</Description>
+        <Description>On a failed clock check, listen for 0x05 as a fallback diagnostic (KW/KW2 only). Successful clock checks keep the optical link open.</Description>
       </Field>
       <Field id="SupportsStatusRequest" type="checkbox" defaultValue="true" hidden="true" />
     </ConfigUI>
     <States>
+      <State id="lastRecordedError"><ValueType>String</ValueType><TriggerLabel>Last recorded error (history)</TriggerLabel><ControlPageLabel>Last recorded error (history)</ControlPageLabel></State>
+      <State id="relayStatusRaw"><ValueType>String</ValueType><TriggerLabel>Raw relay status</TriggerLabel><ControlPageLabel>Raw relay status</ControlPageLabel></State>
+      <State id="lastFaultCheck"><ValueType>String</ValueType><TriggerLabel>Last fault sample (UTC)</TriggerLabel><ControlPageLabel>Last fault sample (UTC)</ControlPageLabel></State>
+      <State id="faultStatus"><ValueType>String</ValueType><TriggerLabel>Current fault interpretation</TriggerLabel><ControlPageLabel>Current fault interpretation</ControlPageLabel></State>
+      <State id="faultCheckError"><ValueType>String</ValueType><TriggerLabel>Fault-sampling error</TriggerLabel><ControlPageLabel>Fault-sampling error</ControlPageLabel></State>
+
+      <State id="controllerTime"><ValueType>String</ValueType><TriggerLabel>Controller clock</TriggerLabel><ControlPageLabel>Controller clock</ControlPageLabel></State>
+      <State id="healthValid"><ValueType>Boolean</ValueType><TriggerLabel>Controller responding</TriggerLabel><ControlPageLabel>Controller responding</ControlPageLabel></State>
+      <State id="lastHealthCheck"><ValueType>String</ValueType><TriggerLabel>Last successful health check (UTC)</TriggerLabel><ControlPageLabel>Last successful health check (UTC)</ControlPageLabel></State>
+      <State id="healthError"><ValueType>String</ValueType><TriggerLabel>Health-check error</TriggerLabel><ControlPageLabel>Health-check error</ControlPageLabel></State>
+
       <State id="dataValid">
         <ValueType>Boolean</ValueType>
         <TriggerLabel>Data valid</TriggerLabel>
@@ -145,6 +164,10 @@
       <Field id="SupportsStatusRequest" type="checkbox" defaultValue="true" hidden="true" />
     </ConfigUI>
     <States>
+      <State id="roomMeasuredTemp"><ValueType>Number</ValueType><TriggerLabel>Measured room temperature (C)</TriggerLabel><ControlPageLabel>Measured room temperature (C)</ControlPageLabel></State>
+      <State id="roomMeasuredTempValid"><ValueType>Boolean</ValueType><TriggerLabel>Measured room temperature valid</TriggerLabel><ControlPageLabel>Measured room temperature valid</ControlPageLabel></State>
+      <State id="roomMeasuredTempUpdated"><ValueType>String</ValueType><TriggerLabel>Room temperature last success (UTC)</TriggerLabel><ControlPageLabel>Room temperature last success (UTC)</ControlPageLabel></State>
+
       <State id="boilerTemp">
         <ValueType>Number</ValueType>
         <TriggerLabel>Boiler temperature (C)</TriggerLabel>

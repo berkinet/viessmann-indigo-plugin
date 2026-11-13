@@ -1,0 +1,14 @@
+[
+  {
+    "command": "getBrennerStatus",
+    "response": "UNKNOWN",
+    "release": "/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0 closed",
+    "utc": "2026-11-13T14:18:24.749722+00:00"
+  },
+  {
+    "command": "getProbeBurner1",
+    "response": "01",
+    "release": "/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0 closed",
+    "utc": "2026-11-13T14:18:29.829895+00:00"
+  }
+]

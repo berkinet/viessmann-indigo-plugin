@@ -1,5 +1,6 @@
 """Single-owner vcontrold polling and explicitly authorized setpoints; independent of Indigo."""
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 import math
 import re
 import socket
@@ -38,6 +39,8 @@ class Settings:
     target: str = "standard"
     activity_probe: bool = True
     live_writes: bool = False
+    health_interval: int = 30
+    fault_interval: int = 60
 
     def __post_init__(self):
         if self.target not in ('standard', 'reduced', 'party'):
@@ -45,7 +48,7 @@ class Settings:
         if not self.host or any(c.isspace() for c in self.host):
             raise ValueError('A hostname or IP address is required')
         for value, low, high in ((self.port, 1, 65535), (self.interval, 30, 86400),
-                                 (self.timeout, 1, 60)):
+                                 (self.timeout, 1, 60), (self.health_interval, 10, 86400), (self.fault_interval, 10, 86400)):
             if not isinstance(value, int) or not low <= value <= high:
                 raise ValueError('Connection settings outside allowed range')
 
@@ -61,22 +64,40 @@ class Result:
     optical_activity: str = 'Unavailable'
     optical_error: str = ''
     optical_checked: bool = False
-    # Reserved for a verified CURRENT fault producer, never history alone.
+    # Current fault interpretation; KO2B relay mapping is an owner-approved trial.
+    # History alone never establishes an active fault.
     verified_active_fault_code: str = ''
+    active_fault_known: bool = False
+    system_time: str = ''
+    health_ok: bool = False
+    health_error: str = ''
+    health_checked: str = ''
+    health_only: bool = False
+    fault_only: bool = False
+    fault_record: str = ''
+    relay_status: str = ''
+    fault_checked: str = ''
+    fault_error: str = ''
 
 
 class Client:
-    """Persistent TCP; release Optolink after each cycle. Not thread-safe by design."""
+    """Persistent TCP and Optolink, one serialized owner. Not thread-safe by design."""
     def __init__(self, settings):
         self.settings = settings
         self.sock = None
         self.buffer = b''
+        self.last_health = None
+        self.last_system_time = ''
+        self.last_health_checked = ''
 
     def disconnect(self):
         if self.sock is not None:
             self.sock.close()
         self.sock = None
         self.buffer = b''
+        self.last_health = None
+        self.last_system_time = ''
+        self.last_health_checked = ''
 
     def _frame(self, cancelled):
         deadline = time.monotonic() + self.settings.timeout
@@ -101,7 +122,7 @@ class Client:
         return frame.decode('ascii').strip()
 
     def _exchange(self, command, cancelled):
-        allowed = set(READS.values()) | {v[0] for v in TARGETS.values()} | {'getProbeRoomTemp', 'device', 'close'}
+        allowed = set(READS.values()) | {v[0] for v in TARGETS.values()} | {'getProbeRoomTemp', 'getSystemTime', 'getError0', 'getProbeRelayStatus', 'device', 'close'}
         if command not in allowed:
             raise ValueError('Command is not an allowed read or link release')
         self.sock.settimeout(self.settings.timeout)
@@ -140,66 +161,138 @@ class Client:
             self.disconnect()
             if cancelled():
                 raise InterruptedError('Polling cancelled')
-            # Never reuse an ambiguous raw-mode stream. Normal polling gets
-            # a fresh TCP session, still owned by this same serial manager.
+
+    def _connect(self, cancelled):
+        if self.sock is None:
             self.sock = socket.create_connection(
                 (self.settings.host, self.settings.port), min(5, self.settings.timeout))
             self._frame(cancelled)
 
+    def _ensure_health(self, result, cancelled, force=False):
+        self._connect(cancelled)
+        result.tcp_available = True
+        identity = self._exchange('device', cancelled)
+        result.simulator = identity == SIMULATOR_ID
+        result.live_identity = identity == LIVE_ID
+        if (force or self.last_health is None
+                or time.monotonic() - self.last_health >= self.settings.health_interval):
+            text = self._exchange('getSystemTime', cancelled)
+            if not re.fullmatch(r'20[0-9]{2}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[+-][0-9]{4}', text):
+                raise ValueError('Invalid controller time: ' + text[:160])
+            datetime.strptime(text, '%Y-%m-%dT%H:%M:%S%z')
+            self.last_health = time.monotonic()
+            self.last_system_time = text
+            self.last_health_checked = datetime.now(timezone.utc).isoformat(timespec='seconds')
+        result.health_ok = True
+        result.system_time = self.last_system_time
+        result.health_checked = self.last_health_checked
+        return identity
+
+    def _health_failure(self, result, exc, cancelled):
+        result.health_error = str(exc)
+        self.disconnect()  # release held serial ownership before any raw diagnostic
+        if cancelled() or not result.tcp_available or not self.settings.activity_probe:
+            return
+        try:
+            self._connect(cancelled)
+            identity = self._exchange('device', cancelled)
+            self._activity_probe(result, identity, cancelled)
+        except (OSError, ValueError, UnicodeError) as diagnostic:
+            result.optical_error = str(diagnostic)
+        finally:
+            self.disconnect()  # raw diagnostics never retain an ambiguous session
+
+    def health(self, cancelled=lambda: False):
+        result = Result(health_only=True)
+        try:
+            self._ensure_health(result, cancelled, force=True)
+        except (OSError, ValueError, UnicodeError) as exc:
+            self._health_failure(result, exc, cancelled)
+        return result
+
+    def fault(self, cancelled=lambda: False):
+        result = Result(health_only=True, fault_only=True)
+        try:
+            self._ensure_health(result, cancelled)
+        except (OSError, ValueError, UnicodeError) as exc:
+            result.fault_error = str(exc)
+            result.health_error = str(exc)
+            self.disconnect()
+            return result
+        errors = []
+        for command, attribute in [('getError0', 'fault_record'), ('getProbeRelayStatus', 'relay_status')]:
+            try:
+                text = self._exchange(command, cancelled)
+            except (OSError, ValueError, UnicodeError) as exc:
+                errors.append(str(exc))
+                self.disconnect()
+                break
+            try:
+                if not text or 'ERR' in text or 'UNKNOWN' in text or 'Error executing' in text:
+                    raise ValueError('Fault sampling failed: ' + text[:160])
+                if attribute == 'relay_status':
+                    if not re.fullmatch(r'[0-9A-Fa-f]{2} [0-9A-Fa-f]{2}', text):
+                        raise ValueError('Invalid relay status: ' + text[:160])
+                    if bytes.fromhex(text) == b'\x05\x05':
+                        raise ValueError('Suspect synchronization bytes in relay status: 05 05')
+                elif not re.search(r'\([0-9A-Fa-f]{2}\)$', text):
+                    raise ValueError('Invalid error history: ' + text[:160])
+                setattr(result, attribute, text)
+            except ValueError as exc:
+                errors.append(str(exc))
+        result.fault_error = '; '.join(errors)
+        if result.relay_status and (result.live_identity or result.simulator):
+            # Provisional mapping observed across D1 and owner-confirmed recovery.
+            # Scope strictly to KO2B/209F, and use only first-byte mask 0x01.
+            result.active_fault_known = True
+            if bytes.fromhex(result.relay_status)[0] & 0x01:
+                match = re.search(r'\(([0-9A-Fa-f]{2})\)$', result.fault_record)
+                code = match.group(1).upper() if match else ''
+                result.verified_active_fault_code = code if code and code != '00' else 'Unknown'
+        if result.relay_status or result.fault_record:
+            result.fault_checked = datetime.now(timezone.utc).isoformat(timespec='seconds')
+        return result
+
     def poll(self, cancelled=lambda: False, on_progress=None):
         result = Result()
         try:
-            if self.sock is None:
-                self.sock = socket.create_connection(
-                    (self.settings.host, self.settings.port), min(5, self.settings.timeout))
-                result.tcp_available = True
-                self._frame(cancelled)
-            result.tcp_available = True
+            self._ensure_health(result, cancelled)
+        except (OSError, ValueError, UnicodeError) as exc:
+            self._health_failure(result, exc, cancelled)
+            for key in READS:
+                result.errors[key] = str(exc) if result.tcp_available else (
+                    f'Connect to {self.settings.host}:{self.settings.port} failed: {exc}')
+            return result
+        reads = dict(READS)
+        reads['roomSetpoint'] = TARGETS[self.settings.target][0]
+        if result.simulator or result.live_identity:
+            reads['roomMeasuredTemp'] = 'getProbeRoomTemp'
+        if result.simulator:
+            reads['dhwSetpoint'] = 'getTempWWsoll'
+        if result.live_identity and self.settings.live_writes:
+            reads['dhwSetpoint'] = 'getTempWWsoll'
+        for key, command in reads.items():
             try:
                 try:
-                    identity = self._exchange('device', cancelled)
-                    result.simulator = identity == SIMULATOR_ID
-                    result.live_identity = identity == LIVE_ID
-                    self._activity_probe(result, identity, cancelled)
-                except (OSError, ValueError, UnicodeError):
+                    response = self._exchange(command, cancelled)
+                except ValueError:
                     self.disconnect()
                     raise
-                reads = dict(READS)
-                reads['roomSetpoint'] = TARGETS[self.settings.target][0]
-                if result.simulator:
-                    reads.update(roomMeasuredTemp='getProbeRoomTemp', dhwSetpoint='getTempWWsoll')
-                if result.live_identity and self.settings.live_writes:
-                    reads['dhwSetpoint'] = 'getTempWWsoll'
-                for key, command in reads.items():
-                    try:
-                        response = self._exchange(command, cancelled)
-                    except (OSError, ValueError, UnicodeError):
-                        # Framing/transport failure: never send more commands on this stream.
-                        self.disconnect()
-                        raise
-                    try:
-                        result.values[key] = temperature(response)
-                        if on_progress is not None:
-                            on_progress(result)
-                    except ValueError as exc:
-                        result.errors[key] = str(exc)
-            finally:
-                if self.sock is not None:
-                    try:
-                        response = self._exchange('close', cancelled)
-                        if not response.endswith(' closed') or 'ERR:' in response:
-                            raise ValueError('Unexpected Optolink release response')
-                    except (OSError, ValueError, UnicodeError) as exc:
-                        result.release_error = str(exc)
-                        self.disconnect()
-        except (OSError, ValueError, UnicodeError) as exc:
-            self.disconnect()
-            for key in READS:
-                if key not in result.values and key not in result.errors:
-                    result.errors[key] = (str(exc) if result.tcp_available else
-                                          f"Connect to {self.settings.host}:{self.settings.port} failed: {exc}")
+                result.values[key] = temperature(response)
+                if on_progress is not None:
+                    on_progress(result)
+            except ValueError as exc:
+                result.errors[key] = str(exc)
+                # A framed decoder error does not invalidate other datapoints.
+                if self.sock is None:
+                    break
+            except (OSError, UnicodeError) as exc:
+                self.disconnect()
+                for missing in reads:
+                    if missing not in result.values and missing not in result.errors:
+                        result.errors[missing] = str(exc)
+                break
         return result
-
 
     def write_setpoint(self, target, value, cancelled=lambda: False):
         """Fresh endpoint identity, explicit live opt-in, one setter and readback; no retries."""
@@ -210,26 +303,20 @@ class Client:
         if not math.isfinite(number) or not number.is_integer() or not low <= number <= high:
             raise ValueError('Target must be a whole degree from %s to %s' % (low, high))
         try:
-            if self.sock is None:
-                self.sock = socket.create_connection((self.settings.host, self.settings.port), min(5, self.settings.timeout))
-                self._frame(cancelled)
-            # Check on this exact connection immediately before the one permitted write.
+            self._connect(cancelled)
             identity = self._exchange('device', cancelled)
             if identity != SIMULATOR_ID:
                 if not self.settings.live_writes or identity != LIVE_ID or target not in LIVE_TARGETS:
                     raise PermissionError('Live writes require opt-in, verified KO2B identity and an allowed target')
-                # Single-byte reads can mistake an ENQ byte for a plausible target.
-                # Require a fresh complete snapshot, including multi-byte temperatures.
-                snapshot = self.poll(cancelled)
-                required = set(READS) | {'dhwSetpoint'}
-                if (not snapshot.live_identity or snapshot.errors or snapshot.release_error
-                        or not required.issubset(snapshot.values)):
-                    raise PermissionError('Live write blocked: fresh complete readings are required')
-                current = snapshot.values['dhwSetpoint' if target == 'dhw' else 'roomSetpoint']
-                if not low <= current <= high:
-                    raise PermissionError('Live write blocked: existing target is outside allowed bounds')
-                if self._exchange('device', cancelled) != LIVE_ID:
-                    raise PermissionError('Controller identity changed before write')
+            # Reuse a recent clock check on this socket; no full pre-write poll.
+            health = Result()
+            checked_identity = self._ensure_health(health, cancelled)
+            if checked_identity != identity:
+                raise PermissionError('Controller identity changed before write')
+            read, setter = TARGETS[target]
+            current = temperature(self._exchange(read, cancelled))
+            if not low <= current <= high:
+                raise PermissionError('Existing target is outside allowed bounds')
             if cancelled():
                 raise InterruptedError('Cancelled before write')
             read, setter = TARGETS[target]
@@ -240,9 +327,6 @@ class Client:
             actual = temperature(self._exchange(read, cancelled))
             if actual != number:
                 raise ValueError('Setpoint readback mismatch; result uncertain, not retried')
-            response = self._exchange('close', cancelled)
-            if not response.endswith(' closed') or 'ERR:' in response:
-                raise ValueError('Optolink release failed after write')
             return actual
         except (OSError, ValueError, UnicodeError):
             self.disconnect()
@@ -260,6 +344,8 @@ class Manager:
         self.requested = False
         self.startup_failures = 0
         self.startup_complete = False
+        self.health_due = 0
+        self.fault_due = 0
 
     def configure(self, settings):
         if settings != self.settings:
@@ -268,6 +354,8 @@ class Manager:
             self.startup_failures = 0
             self.startup_complete = False
             self.due = self.clock()
+            self.health_due = self.clock()
+            self.fault_due = self.clock()
 
     def request_poll(self):
         # Called only by the worker; repeated queued refresh requests coalesce.
@@ -275,13 +363,28 @@ class Manager:
 
     def tick(self, cancelled=lambda: False, on_progress=None):
         if (self.settings is None or cancelled()
-                or (not self.requested and (not self.settings.enabled or self.clock() < self.due))):
+                or (not self.requested and (not self.settings.enabled
+                    or self.clock() < min(self.due, self.health_due, self.fault_due)))):
             return None
         if self.client is None:
             self.client = self.client_factory(self.settings)
+        if not self.requested and self.clock() < self.due and self.clock() >= self.fault_due:
+            result = self.client.fault(cancelled)
+            self.fault_due = self.clock() + self.settings.fault_interval
+            if result.health_ok:
+                self.health_due = self.clock() + self.settings.health_interval
+            return result
+        if not self.requested and self.clock() < self.due:
+            result = self.client.health(cancelled)
+            self.health_due = self.clock() + self.settings.health_interval
+            return result
         self.requested = False
         result = (self.client.poll(cancelled) if on_progress is None
                   else self.client.poll(cancelled, on_progress))
+        self.health_due = self.clock() + self.settings.health_interval
+        if self.fault_due <= self.clock():
+            # Full readings and fault reads are separate serialized work items.
+            self.fault_due = self.clock()
         complete = (set(READS).issubset(result.values) and not result.errors
                     and not result.release_error)
         delay = self.settings.interval
@@ -301,7 +404,6 @@ class Manager:
         if self.client is None:
             self.client = self.client_factory(self.settings)
         actual = self.client.write_setpoint(target, value, cancelled)
-        self.due = self.clock()
         return actual
 
     def close(self):

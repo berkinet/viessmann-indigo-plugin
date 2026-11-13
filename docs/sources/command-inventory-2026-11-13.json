@@ -1,0 +1,1306 @@
+[
+  {
+    "name": "getOutsideTemp",
+    "operation": "getaddr",
+    "address": "0800",
+    "length": "2",
+    "unit": "UT",
+    "description": "Outside temperature in degrees C"
+  },
+  {
+    "name": "getBoilerTemp",
+    "operation": "getaddr",
+    "address": "0802",
+    "length": "2",
+    "unit": "UT",
+    "description": "Boiler temperature in degrees C"
+  },
+  {
+    "name": "getWaterTemp",
+    "operation": "getaddr",
+    "address": "0804",
+    "length": "2",
+    "unit": "UT",
+    "description": "Hot water temperature in degrees C"
+  },
+  {
+    "name": "getExhaustTemp",
+    "operation": "getaddr",
+    "address": "0808",
+    "length": "2",
+    "unit": "UT",
+    "description": "Exhaust temperature in degrees C"
+  },
+  {
+    "name": "getTemp17A",
+    "operation": "getaddr",
+    "address": "080A",
+    "length": "2",
+    "unit": "UT",
+    "description": "Return temperature 17A in degrees C"
+  },
+  {
+    "name": "getTemp17B",
+    "operation": "getaddr",
+    "address": "080C",
+    "length": "2",
+    "unit": "UT",
+    "description": "Flow temperature 17B in degrees C"
+  },
+  {
+    "name": "getStorageTemp",
+    "operation": "getaddr",
+    "address": "70",
+    "length": "1",
+    "unit": "UT1",
+    "description": "Storage tank temperature in degrees C"
+  },
+  {
+    "name": "getTempWWsoll",
+    "operation": "getaddr",
+    "address": "6300",
+    "length": "1",
+    "unit": "ST",
+    "description": "Ermittle die Warmwassersolltemperatur in Grad C"
+  },
+  {
+    "name": "getTempKsoll",
+    "operation": "getaddr",
+    "address": "5502",
+    "length": "2",
+    "unit": "UT",
+    "description": "Ermittle die Kesselsolltemperatur in Grad C"
+  },
+  {
+    "name": "getTempVListM1",
+    "operation": "getaddr",
+    "address": "",
+    "length": "2",
+    "unit": "UT",
+    "description": "Ermittle die Vorlauftemperatur M1 in Grad C"
+  },
+  {
+    "name": "getTempVListM2",
+    "operation": "getaddr",
+    "address": "080C",
+    "length": "2",
+    "unit": "UT",
+    "description": "Ermittle die Vorlauftemperatur M2 in Grad C"
+  },
+  {
+    "name": "getTempVLsollM1",
+    "operation": "getaddr",
+    "address": "2544",
+    "length": "2",
+    "unit": "UT",
+    "description": "Ermittle die Vorlaufsolltemperatur M1 in Grad C"
+  },
+  {
+    "name": "getTempVLsollM2",
+    "operation": "getaddr",
+    "address": "3544",
+    "length": "2",
+    "unit": "UT",
+    "description": "Ermittle die Vorlaufsolltemperatur M2 in Grad C"
+  },
+  {
+    "name": "getTempVLsollM3",
+    "operation": "getaddr",
+    "address": "4544",
+    "length": "2",
+    "unit": "UT",
+    "description": "Ermittle die Vorlaufsolltemperatur M3 in Grad C"
+  },
+  {
+    "name": "getTempKol",
+    "operation": "getaddr",
+    "address": "6564",
+    "length": "2",
+    "unit": "UT",
+    "description": "Ermittle die Kollektortemperatur in Grad C"
+  },
+  {
+    "name": "getTempSpu",
+    "operation": "getaddr",
+    "address": "6566",
+    "length": "2",
+    "unit": "UT",
+    "description": "Ermittle die Speichertemperatur unten in Grad C"
+  },
+  {
+    "name": "getRoomTempSP",
+    "operation": "getaddr",
+    "address": "2306",
+    "length": "1",
+    "unit": "ST",
+    "description": "Room temperature in degrees C"
+  },
+  {
+    "name": "setTempRaumNorSollM1",
+    "operation": "setaddr",
+    "address": "2306",
+    "length": "1",
+    "unit": "ST",
+    "description": "Setze die Raumsolltemperatur normal M1 in Grad C"
+  },
+  {
+    "name": "getTempRaumNorSollM2",
+    "operation": "getaddr",
+    "address": "3306",
+    "length": "1",
+    "unit": "ST",
+    "description": "Ermittle die Raumsolltemperatur normal M2 in Grad C"
+  },
+  {
+    "name": "getTempRaumRedSollM1",
+    "operation": "getaddr",
+    "address": "2307",
+    "length": "1",
+    "unit": "ST",
+    "description": "Ermittle die Raumsolltemperatur reduziert M1 in Grad C"
+  },
+  {
+    "name": "setTempRaumRedSollM1",
+    "operation": "setaddr",
+    "address": "2307",
+    "length": "1",
+    "unit": "ST",
+    "description": "Setze die Raumsolltemperatur reduziert M1 in Grad C"
+  },
+  {
+    "name": "getTempRaumRedSollM2",
+    "operation": "getaddr",
+    "address": "3307",
+    "length": "1",
+    "unit": "ST",
+    "description": "Ermittle die Raumsolltemperatur reduziert M2 in Grad C"
+  },
+  {
+    "name": "getBrennerStatus",
+    "operation": "getaddr",
+    "address": "551E",
+    "length": "1",
+    "unit": "RT",
+    "description": "Ermittle den Brennerstatus"
+  },
+  {
+    "name": "getBurnerStarts",
+    "operation": "getaddr",
+    "address": "088A",
+    "length": "2",
+    "unit": "CO",
+    "description": "Burner Starts"
+  },
+  {
+    "name": "getBurnerHours1",
+    "operation": "getaddr",
+    "address": "08A7",
+    "length": "4",
+    "unit": "CS",
+    "description": "Burner hours Level 1"
+  },
+  {
+    "name": "getBurnerHours2",
+    "operation": "getaddr",
+    "address": "08AB",
+    "length": "4",
+    "unit": "CS",
+    "description": "Burner hours Level 2"
+  },
+  {
+    "name": "getPumpStatus",
+    "operation": "getaddr",
+    "address": "2906",
+    "length": "1",
+    "unit": "RT",
+    "description": "Pump  Status"
+  },
+  {
+    "name": "getPumpStatusSp",
+    "operation": "getaddr",
+    "address": "0845",
+    "length": "1",
+    "unit": "RT",
+    "description": "Status of the storage tank charging pump"
+  },
+  {
+    "name": "getCircPumpStatus",
+    "operation": "getaddr",
+    "address": "0846",
+    "length": "1",
+    "unit": "RT",
+    "description": "Status of the circulation pump"
+  },
+  {
+    "name": "getSolarPumpStatus",
+    "operation": "getaddr",
+    "address": "6552",
+    "length": "1",
+    "unit": "RT",
+    "description": "Status of the solar pump"
+  },
+  {
+    "name": "getPumpeStatusM2",
+    "operation": "getaddr",
+    "address": "3906",
+    "length": "1",
+    "unit": "RT",
+    "description": "Ermittle den Status der Pumpe M2"
+  },
+  {
+    "name": "getBurnerOutput",
+    "operation": "getaddr",
+    "address": "55E3",
+    "length": "1",
+    "unit": "PR",
+    "description": "Burner output 0 to 100%"
+  },
+  {
+    "name": "getMixerPosition1",
+    "operation": "getaddr",
+    "address": "254C",
+    "length": "1",
+    "unit": "PR",
+    "description": "Mixer position "
+  },
+  {
+    "name": "getMixerPosition2",
+    "operation": "getaddr",
+    "address": "354C",
+    "length": "1",
+    "unit": "PR",
+    "description": "Mixer position 2 "
+  },
+  {
+    "name": "getMixerPosition2",
+    "operation": "getaddr",
+    "address": "454C",
+    "length": "1",
+    "unit": "PR",
+    "description": "Mixer position 3 "
+  },
+  {
+    "name": "getThrottlePosition",
+    "operation": "getaddr",
+    "address": "5555",
+    "length": "1",
+    "unit": "PR",
+    "description": "Throttle poition"
+  },
+  {
+    "name": "getSolarStatusWW",
+    "operation": "getaddr",
+    "address": "6551",
+    "length": "1",
+    "unit": "RT",
+    "description": "Ermittle den Status der Nachladeunterdrueckung"
+  },
+  {
+    "name": "getTimerM1Mo",
+    "operation": "getaddr",
+    "address": "2000",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Montag M1"
+  },
+  {
+    "name": "getTimerM1Di",
+    "operation": "getaddr",
+    "address": "2008",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Dienstag M1"
+  },
+  {
+    "name": "getTimerM1Mi",
+    "operation": "getaddr",
+    "address": "2010",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit MIttwoch M1"
+  },
+  {
+    "name": "getTimerM1Do",
+    "operation": "getaddr",
+    "address": "2018",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Donnerstag M1"
+  },
+  {
+    "name": "getTimerM1Fr",
+    "operation": "getaddr",
+    "address": "2020",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Freitag M1"
+  },
+  {
+    "name": "getTimerM1Sa",
+    "operation": "getaddr",
+    "address": "2028",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Samstag M1"
+  },
+  {
+    "name": "getTimerM1So",
+    "operation": "getaddr",
+    "address": "2030",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Sonntag M1"
+  },
+  {
+    "name": "getTimerM2Mo",
+    "operation": "getaddr",
+    "address": "3000",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Montag M2"
+  },
+  {
+    "name": "getTimerM2Di",
+    "operation": "getaddr",
+    "address": "3008",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Dienstag M2"
+  },
+  {
+    "name": "getTimerM2Mi",
+    "operation": "getaddr",
+    "address": "3010",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Mittwoch M2"
+  },
+  {
+    "name": "getTimerM2Do",
+    "operation": "getaddr",
+    "address": "3018",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Donnerstag M2"
+  },
+  {
+    "name": "getTimerM2Fr",
+    "operation": "getaddr",
+    "address": "3020",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Freitag M2"
+  },
+  {
+    "name": "getTimerM2Sa",
+    "operation": "getaddr",
+    "address": "3028",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Samstag M2"
+  },
+  {
+    "name": "getTimerM2So",
+    "operation": "getaddr",
+    "address": "3030",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Sonntag M2"
+  },
+  {
+    "name": "getTimerWWMo",
+    "operation": "getaddr",
+    "address": "2100",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Montag Warmwasser"
+  },
+  {
+    "name": "getTimerWWDi",
+    "operation": "getaddr",
+    "address": "2108",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Dienstag Warmwasser"
+  },
+  {
+    "name": "getTimerWWMi",
+    "operation": "getaddr",
+    "address": "2110",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Mittwoch Warmwasser"
+  },
+  {
+    "name": "getTimerWWDo",
+    "operation": "getaddr",
+    "address": "2118",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Donnerstag Warmwasser"
+  },
+  {
+    "name": "getTimerWWFr",
+    "operation": "getaddr",
+    "address": "2120",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Freitag Warmwasser"
+  },
+  {
+    "name": "getTimerWWSa",
+    "operation": "getaddr",
+    "address": "2128",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Samstag Warmwasser"
+  },
+  {
+    "name": "getTimerWWSo",
+    "operation": "getaddr",
+    "address": "2130",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Sonntag Warmwasser"
+  },
+  {
+    "name": "getTimerZirkuMo",
+    "operation": "getaddr",
+    "address": "2200",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Montag Zirku"
+  },
+  {
+    "name": "getTimerZirkuDi",
+    "operation": "getaddr",
+    "address": "2208",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Dienstag Zirku"
+  },
+  {
+    "name": "getTimerZirkuMi",
+    "operation": "getaddr",
+    "address": "2210",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Mittwoch Zirku"
+  },
+  {
+    "name": "getTimerZirkuDo",
+    "operation": "getaddr",
+    "address": "2218",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Donnerstag Zirku"
+  },
+  {
+    "name": "getTimerZirkuFr",
+    "operation": "getaddr",
+    "address": "2220",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Freitag Zirku"
+  },
+  {
+    "name": "getTimerZirkuSa",
+    "operation": "getaddr",
+    "address": "2228",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Samstag Zirku"
+  },
+  {
+    "name": "getTimerZirkuSo",
+    "operation": "getaddr",
+    "address": "2230",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Sonntag Zirku"
+  },
+  {
+    "name": "getCurrentMode",
+    "operation": "getaddr",
+    "address": "2301",
+    "length": "1",
+    "unit": "BA",
+    "description": "Current mode 1"
+  },
+  {
+    "name": "getCurrentMode2",
+    "operation": "getaddr",
+    "address": "3301",
+    "length": "1",
+    "unit": "BA",
+    "description": "Current mode 2"
+  },
+  {
+    "name": "getSavingMode1",
+    "operation": "getaddr",
+    "address": "2302",
+    "length": "1",
+    "unit": "RT",
+    "description": "Saving mode 1 status"
+  },
+  {
+    "name": "getSavingMode2",
+    "operation": "getaddr",
+    "address": "3302",
+    "length": "1",
+    "unit": "RT",
+    "description": "Saving mode 2 status"
+  },
+  {
+    "name": "getPartyMode1",
+    "operation": "getaddr",
+    "address": "2303",
+    "length": "1",
+    "unit": "RT",
+    "description": "Party mode 1 status"
+  },
+  {
+    "name": "getPartyMode2",
+    "operation": "getaddr",
+    "address": "3303",
+    "length": "1",
+    "unit": "RT",
+    "description": "Party mode 2 status"
+  },
+  {
+    "name": "getSolarStunden",
+    "operation": "getaddr",
+    "address": "6568",
+    "length": "2",
+    "unit": "CO",
+    "description": "Solar Betriebsstunden"
+  },
+  {
+    "name": "getSolarLeistung",
+    "operation": "getaddr",
+    "address": "6560",
+    "length": "4",
+    "unit": "CO",
+    "description": "Solar Leistung Gesamt"
+  },
+  {
+    "name": "getStatusFrost1",
+    "operation": "getaddr",
+    "address": "2500",
+    "length": "1",
+    "unit": "ST",
+    "description": "Status Frost warning 1"
+  },
+  {
+    "name": "getStatusFrost2",
+    "operation": "getaddr",
+    "address": "3500",
+    "length": "1",
+    "unit": "ST",
+    "description": "Status Frost warning 2"
+  },
+  {
+    "name": "getOilUsage",
+    "operation": "getaddr",
+    "address": "7574",
+    "length": "4",
+    "unit": "CO",
+    "description": "Oil Usage"
+  },
+  {
+    "name": "getStatusStoerung",
+    "operation": "getaddr",
+    "address": "7579",
+    "length": "1",
+    "unit": "RT",
+    "description": "Status Sammelstoerung"
+  },
+  {
+    "name": "getTempPartyM1",
+    "operation": "getaddr",
+    "address": "2308",
+    "length": "1",
+    "unit": "ST",
+    "description": "Solltemperatur Partybetrieb M1"
+  },
+  {
+    "name": "getTempPartyM2",
+    "operation": "getaddr",
+    "address": "3308",
+    "length": "1",
+    "unit": "ST",
+    "description": "Solltemperatur Partybetrieb M2"
+  },
+  {
+    "name": "getSystemTime",
+    "operation": "getaddr",
+    "address": "088E",
+    "length": "8",
+    "unit": "TI",
+    "description": "Ermittle Systemzeit"
+  },
+  {
+    "name": "setSystemTime",
+    "operation": "setaddr",
+    "address": "088E",
+    "length": "8",
+    "unit": "TI",
+    "description": "Setze Systemzeit"
+  },
+  {
+    "name": "setTempWWsoll",
+    "operation": "setaddr",
+    "address": "6300",
+    "length": "1",
+    "unit": "ST",
+    "description": "Setze die Warmwassersolltemperatur in Grad C"
+  },
+  {
+    "name": "setTempPartyM1",
+    "operation": "setaddr",
+    "address": "2308",
+    "length": "1",
+    "unit": "ST",
+    "description": "Setze die Warmwassersolltemperatur Party M1 in Grad C"
+  },
+  {
+    "name": "setTempPartyM2",
+    "operation": "setaddr",
+    "address": "3308",
+    "length": "1",
+    "unit": "ST",
+    "description": "Setze die Warmwassersolltemperatur Party M2 in Grad C"
+  },
+  {
+    "name": "setBetriebArtM1",
+    "operation": "setaddr",
+    "address": "2301",
+    "length": "1",
+    "unit": "BA",
+    "description": "Setze Betriebsart M1"
+  },
+  {
+    "name": "setBetriebSparM1",
+    "operation": "setaddr",
+    "address": "2302",
+    "length": "1",
+    "unit": "RT",
+    "description": "Setze Betriebsart Spar M1"
+  },
+  {
+    "name": "setBetriebPartyM1",
+    "operation": "setaddr",
+    "address": "2303",
+    "length": "1",
+    "unit": "RT",
+    "description": "Setze Betriebsart Party M1"
+  },
+  {
+    "name": "setBetriebPartyM2",
+    "operation": "setaddr",
+    "address": "3303",
+    "length": "1",
+    "unit": "RT",
+    "description": "Setze Betriebsart Party M2"
+  },
+  {
+    "name": "setPumpeStatusZirku",
+    "operation": "setaddr",
+    "address": "0846",
+    "length": "1",
+    "unit": "RT",
+    "description": "Setze den Status der Zirkulationspumpe"
+  },
+  {
+    "name": "setTimerM1Mo",
+    "operation": "setaddr",
+    "address": "2000",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Montag M1"
+  },
+  {
+    "name": "setTimerM1Di",
+    "operation": "setaddr",
+    "address": "2008",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Dienstag M1"
+  },
+  {
+    "name": "setTimerM1Mi",
+    "operation": "setaddr",
+    "address": "2010",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Mittwoch M1"
+  },
+  {
+    "name": "setTimerM1Do",
+    "operation": "setaddr",
+    "address": "2018",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Donnerstag M1"
+  },
+  {
+    "name": "setTimerM1Fr",
+    "operation": "setaddr",
+    "address": "2020",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Freitag M1"
+  },
+  {
+    "name": "setTimerM1Sa",
+    "operation": "setaddr",
+    "address": "2028",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Samstag M1"
+  },
+  {
+    "name": "setTimerM1So",
+    "operation": "setaddr",
+    "address": "2030",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Sonntag M1"
+  },
+  {
+    "name": "setTimerM2Mo",
+    "operation": "setaddr",
+    "address": "3000",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Montag M2"
+  },
+  {
+    "name": "setTimerM2Di",
+    "operation": "setaddr",
+    "address": "3008",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Dienstag M2"
+  },
+  {
+    "name": "setTimerM2Mi",
+    "operation": "setaddr",
+    "address": "3010",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Mittwoch M2"
+  },
+  {
+    "name": "setTimerM2Do",
+    "operation": "setaddr",
+    "address": "3018",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Donnerstag M2"
+  },
+  {
+    "name": "setTimerM2Fr",
+    "operation": "setaddr",
+    "address": "3020",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Freitag M2"
+  },
+  {
+    "name": "setTimerM2Sa",
+    "operation": "setaddr",
+    "address": "3028",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Samstag M2"
+  },
+  {
+    "name": "setTimerM2So",
+    "operation": "setaddr",
+    "address": "3030",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Sonntag M2"
+  },
+  {
+    "name": "setTimerWWMo",
+    "operation": "setaddr",
+    "address": "2100",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Montag Warmwasser"
+  },
+  {
+    "name": "setTimerWWDi",
+    "operation": "setaddr",
+    "address": "2108",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Dienstag Warmwasser"
+  },
+  {
+    "name": "setTimerWWMi",
+    "operation": "setaddr",
+    "address": "2110",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Mittwoch Warmwasser"
+  },
+  {
+    "name": "setTimerWWDo",
+    "operation": "setaddr",
+    "address": "2118",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Donnerstag Warmwasser"
+  },
+  {
+    "name": "setTimerWWFr",
+    "operation": "setaddr",
+    "address": "2120",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Freitag Warmwasser"
+  },
+  {
+    "name": "setTimerWWSa",
+    "operation": "setaddr",
+    "address": "2128",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Samstag Warmwasser"
+  },
+  {
+    "name": "setTimerWWSo",
+    "operation": "setaddr",
+    "address": "2130",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Sonntag Warmwasser"
+  },
+  {
+    "name": "setTimerZirkuMo",
+    "operation": "setaddr",
+    "address": "2200",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Montag Zirku"
+  },
+  {
+    "name": "setTimerZirkuDi",
+    "operation": "setaddr",
+    "address": "2208",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Dienstag Zirku"
+  },
+  {
+    "name": "setTimerZirkuMi",
+    "operation": "setaddr",
+    "address": "2210",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Mittwoch Zirku"
+  },
+  {
+    "name": "setTimerZirkuDo",
+    "operation": "setaddr",
+    "address": "2218",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Donnerstag Zirku"
+  },
+  {
+    "name": "setTimerZirkuFr",
+    "operation": "setaddr",
+    "address": "2220",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Freitag Zirku"
+  },
+  {
+    "name": "setTimerZirkuSa",
+    "operation": "setaddr",
+    "address": "2228",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Samstag Zirku"
+  },
+  {
+    "name": "setTimerZirkuSo",
+    "operation": "setaddr",
+    "address": "2230",
+    "length": "8",
+    "unit": "CT",
+    "description": "Schaltzeit Sonntag Zirku"
+  },
+  {
+    "name": "getError0",
+    "operation": "getaddr",
+    "address": "7507",
+    "length": "9",
+    "unit": "ES",
+    "description": "Ermittle Fehlerhistory Eintrag 1"
+  },
+  {
+    "name": "getError1",
+    "operation": "getaddr",
+    "address": "7510",
+    "length": "9",
+    "unit": "ES",
+    "description": "Ermittle Fehlerhistory Eintrag 2"
+  },
+  {
+    "name": "getError2",
+    "operation": "getaddr",
+    "address": "7519",
+    "length": "9",
+    "unit": "ES",
+    "description": "Ermittle Fehlerhistory Eintrag 3"
+  },
+  {
+    "name": "getError3",
+    "operation": "getaddr",
+    "address": "7522",
+    "length": "9",
+    "unit": "ES",
+    "description": "Ermittle Fehlerhistory Eintrag 4"
+  },
+  {
+    "name": "getError4",
+    "operation": "getaddr",
+    "address": "752B",
+    "length": "9",
+    "unit": "ES",
+    "description": "Ermittle Fehlerhistory Eintrag 5"
+  },
+  {
+    "name": "getError5",
+    "operation": "getaddr",
+    "address": "7534",
+    "length": "9",
+    "unit": "ES",
+    "description": "Ermittle Fehlerhistory Eintrag 6"
+  },
+  {
+    "name": "getError6",
+    "operation": "getaddr",
+    "address": "753D",
+    "length": "9",
+    "unit": "ES",
+    "description": "Ermittle Fehlerhistory Eintrag 7"
+  },
+  {
+    "name": "getError7",
+    "operation": "getaddr",
+    "address": "7546",
+    "length": "9",
+    "unit": "ES",
+    "description": "Ermittle Fehlerhistory Eintrag 8"
+  },
+  {
+    "name": "getError8",
+    "operation": "getaddr",
+    "address": "754F",
+    "length": "9",
+    "unit": "ES",
+    "description": "Ermittle Fehlerhistory Eintrag 9"
+  },
+  {
+    "name": "getError9",
+    "operation": "getaddr",
+    "address": "7558",
+    "length": "9",
+    "unit": "ES",
+    "description": "Ermittle Fehlerhistory Eintrag 10"
+  },
+  {
+    "name": "getNeigungM1",
+    "operation": "getaddr",
+    "address": "2305",
+    "length": "1",
+    "unit": "UN",
+    "description": "Ermittle Neigung Heizkennlinie M1"
+  },
+  {
+    "name": "getNeigungM2",
+    "operation": "getaddr",
+    "address": "3305",
+    "length": "1",
+    "unit": "UN",
+    "description": "Ermittle Neigung Heizkennlinie M2"
+  },
+  {
+    "name": "getNiveauM1",
+    "operation": "getaddr",
+    "address": "2304",
+    "length": "1",
+    "unit": "ST",
+    "description": "Ermittle Niveau Heizkennlinie M1"
+  },
+  {
+    "name": "getNiveauM2",
+    "operation": "getaddr",
+    "address": "3304",
+    "length": "1",
+    "unit": "ST",
+    "description": "Ermittle Niveau Heizkennlinie M2"
+  },
+  {
+    "name": "setNeigungM1",
+    "operation": "setaddr",
+    "address": "2305",
+    "length": "1",
+    "unit": "UN",
+    "description": "Setze Neigung Heizkennlinie M1"
+  },
+  {
+    "name": "setNeigungM2",
+    "operation": "setaddr",
+    "address": "3305",
+    "length": "1",
+    "unit": "UN",
+    "description": "Setze Neigung Heizkennlinie M2"
+  },
+  {
+    "name": "setNiveauM1",
+    "operation": "setaddr",
+    "address": "2304",
+    "length": "1",
+    "unit": "ST",
+    "description": "Setze Niveau Heizkennlinie M1"
+  },
+  {
+    "name": "setNiveauM2",
+    "operation": "setaddr",
+    "address": "3304",
+    "length": "1",
+    "unit": "ST",
+    "description": "Setze Niveau Heizkennlinie M2"
+  },
+  {
+    "name": "getDevType",
+    "operation": "getaddr",
+    "address": "00F8",
+    "length": "2",
+    "unit": "DT",
+    "description": "Ermittle Device Typ der Anlage"
+  },
+  {
+    "name": "init",
+    "operation": "getaddr",
+    "address": "",
+    "length": "",
+    "unit": "",
+    "description": "Inintialisierung"
+  },
+  {
+    "name": "get",
+    "operation": "gettestaddr",
+    "address": "",
+    "length": "",
+    "unit": "",
+    "description": "Testabfrage, Adresse eingeben"
+  },
+  {
+    "name": "vget",
+    "operation": "getvtestaddr",
+    "address": "",
+    "length": "",
+    "unit": "",
+    "description": "Testabfrage, Virtuelle Adresse eingeben"
+  },
+  {
+    "name": "bget",
+    "operation": "getbtestaddr",
+    "address": "",
+    "length": "",
+    "unit": "",
+    "description": "Testabfrage, Bedienteil Adresse eingeben"
+  },
+  {
+    "name": "pget",
+    "operation": "getptestaddr",
+    "address": "",
+    "length": "",
+    "unit": "",
+    "description": "Testabfrage, Port Adresse eingeben"
+  },
+  {
+    "name": "eget",
+    "operation": "getetestaddr",
+    "address": "",
+    "length": "",
+    "unit": "",
+    "description": "Testabfrage, EEProm Adresse eingeben"
+  },
+  {
+    "name": "xget",
+    "operation": "getxtestaddr",
+    "address": "",
+    "length": "",
+    "unit": "",
+    "description": "Testabfrage, XRAM Adresse eingeben"
+  },
+  {
+    "name": "kmget",
+    "operation": "getkmtestaddr",
+    "address": "",
+    "length": "",
+    "unit": "",
+    "description": "Testabfrage, KM-Bus EEProm Adresse eingeben"
+  },
+  {
+    "name": "getExtBA",
+    "operation": "getxaddr",
+    "address": "",
+    "length": "",
+    "unit": "",
+    "description": "Ermittle Zustand der externen Betriebsartenumschaltung"
+  },
+  {
+    "name": "getPumpeSollM1",
+    "operation": "getaddr",
+    "address": "",
+    "length": "",
+    "unit": "",
+    "description": "Ermittle Solldrehzahl Pumpe M1"
+  },
+  {
+    "name": "getVentilStatus",
+    "operation": "getpaddr",
+    "address": "",
+    "length": "",
+    "unit": "",
+    "description": "Ermittle Zustand Umschaltventil WW/Heizen"
+  },
+  {
+    "name": "getHKPTyp",
+    "operation": "geteaddr",
+    "address": "",
+    "length": "",
+    "unit": "",
+    "description": "Ermittle Typ der Heizkreispumpe"
+  },
+  {
+    "name": "getTempRueck",
+    "operation": "getaddr",
+    "address": "",
+    "length": "",
+    "unit": "",
+    "description": "Ermittle die Rueckauftemepratur"
+  },
+  {
+    "name": "getProbeFlowA1",
+    "operation": "getaddr",
+    "address": "0810",
+    "length": "2",
+    "unit": "UT",
+    "description": "Candidate A1 flow temperature; OpenV 209F table; unverified"
+  },
+  {
+    "name": "getProbeStorage",
+    "operation": "getaddr",
+    "address": "0812",
+    "length": "2",
+    "unit": "UT",
+    "description": "Candidate filtered storage temperature; OpenV 209F table; unverified"
+  },
+  {
+    "name": "getProbeBurner1",
+    "operation": "getaddr",
+    "address": "0842",
+    "length": "1",
+    "unit": "",
+    "description": "Candidate burner stage 1; raw byte; unverified"
+  },
+  {
+    "name": "getProbeProgram",
+    "operation": "getaddr",
+    "address": "2323",
+    "length": "1",
+    "unit": "",
+    "description": "Candidate operating program; raw byte; do not use legacy BA mapping"
+  },
+  {
+    "name": "getProbeCurveLevel",
+    "operation": "getaddr",
+    "address": "27D4",
+    "length": "1",
+    "unit": "",
+    "description": "Candidate heating curve shift; raw byte; signed decoding unverified"
+  },
+  {
+    "name": "getProbeCurveSlope",
+    "operation": "getaddr",
+    "address": "27D3",
+    "length": "1",
+    "unit": "",
+    "description": "Candidate heating curve slope; raw byte; wiki suggests divide by 10"
+  },
+  {
+    "name": "getProbeSolarDay",
+    "operation": "getaddr",
+    "address": "CF30",
+    "length": "4",
+    "unit": "",
+    "description": "Candidate solar daily yield; raw bytes; only relevant with solar hardware"
+  },
+  {
+    "name": "getProbeStarts",
+    "operation": "getaddr",
+    "address": "088A",
+    "length": "4",
+    "unit": "",
+    "description": "Candidate four-byte burner starts; raw bytes; compare with existing two-byte read"
+  },
+  {
+    "name": "getProbeRoomTemp",
+    "operation": "getaddr",
+    "address": "0896",
+    "length": "2",
+    "unit": "UT",
+    "description": "LOW CONFIDENCE measured room temperature candidate from 20CB example; not verified for 209F"
+  },
+  {
+    "name": "getProbeRoomSensorStatus",
+    "operation": "getaddr",
+    "address": "089C",
+    "length": "1",
+    "unit": "",
+    "description": "KO2B room sensor status; enumeration unverified"
+  },
+  {
+    "name": "getProbeProductionStatus",
+    "operation": "getaddr",
+    "address": "A395",
+    "length": "1",
+    "unit": "",
+    "description": "KO2B production state first byte; layout unverified"
+  },
+  {
+    "name": "getProbeRelayStatus",
+    "operation": "getaddr",
+    "address": "A152",
+    "length": "2",
+    "unit": "",
+    "description": "KO2B relay state first two bytes; bit layout unverified"
+  },
+  {
+    "name": "getProbeAlarmHeader",
+    "operation": "getaddr",
+    "address": "A132",
+    "length": "1",
+    "unit": "",
+    "description": "KO2B alarm header first byte; layout unverified"
+  },
+  {
+    "name": "getProbeBurnerFault",
+    "operation": "getaddr",
+    "address": "0884",
+    "length": "1",
+    "unit": "",
+    "description": "Cross-model burner fault candidate; applicability unverified"
+  }
+]

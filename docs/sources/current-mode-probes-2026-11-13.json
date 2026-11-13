@@ -1,0 +1,26 @@
+[
+  {
+    "command": "getSystemTime",
+    "response": "2026-11-13T15:04:31+0000",
+    "release": "/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0 closed",
+    "utc": "2026-11-13T14:15:24.792548+00:00"
+  },
+  {
+    "command": "getCurrentMode",
+    "response": "Heating and Warm-Water",
+    "release": "/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0 closed",
+    "utc": "2026-11-13T14:15:29.876260+00:00"
+  },
+  {
+    "command": "getCurrentMode2",
+    "response": "Heating and Warm-Water",
+    "release": "/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0 closed",
+    "utc": "2026-11-13T14:15:42.166127+00:00"
+  },
+  {
+    "command": "getProbeProgram",
+    "response": "02",
+    "release": "/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0 closed",
+    "utc": "2026-11-13T14:15:47.266940+00:00"
+  }
+]

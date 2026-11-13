@@ -51,3 +51,19 @@ On 8 November 2026 the owner supplied a photograph identifying the installed con
 ## Owner-authorized live-write opt-in (0.2.12)
 
 On 13 November the owner requested live standard-room and DHW writes selectable in plugin configuration, superseding the earlier blanket simulator-only rule for those two targets only. Default remains off. Require exact KO2B identity, a fresh complete error-free snapshot, bounded whole-degree target, acknowledgement and matching readback; no retries of uncertain writes. Reduced/party remain simulator-only. The first unchanged live setter validation failed acknowledgement; physical write effectiveness is still unverified. See docs/thermostat-trial.md. Never enable the preference on the owner's behalf or interpret the feature as permission for unrelated writes.
+
+## Verified room measurement — 13 November 2026
+
+The owner confirmed measured room temperature tracking 20.6 -> 20.7 C alongside live getProbeRoomTemp (0896/2/UT). Earlier statements that measured room temperature is unavailable are superseded for this installed KO2B. Existing plugin display still uses provisional boiler temperature until deliberately changed; see docs/live-probes-2026-11-13.md. Keep the pending-set display changes unpublished until owner authorization.
+
+## Unpublished lifecycle revision (owner-directed, 13 November)
+
+The owner requested persistent TCP **and** optical ownership, establishing health via getSystemTime and keeping the optical link open between commands. This supersedes the earlier close-after-every-cycle and complete-snapshot-before-every-write instructions for the local 0.2.15 implementation. Clock health defaults to 30 seconds, independent error-history/relay sampling to 60 seconds, full readings to the existing 180 seconds; all are configurable on the system device. Writes remain opt-in, exact-identity checked, bounded, target-read/ACK/readback confirmed and never automatically retried. Measured room temperature is now the heater's native default. Do not infer an active fault from getError0 alone or invent an A152 bit mapping. Preserve established faults until explicit verified clear evidence; production of that evidence remains unimplemented. Maintain the publication hold: no push, release or installed-plugin update until instructed. Local simulator clock support is also unpublished.
+
+## Relay display trial authorized; publication requires owner OK
+
+The owner explicitly authorized coding the A152 first-byte mask 01 interpretation for display after D1/clear observations. This supersedes the prior prohibition on adopting that bit in the local draft: implement it as provisional and exact-KO2B-scoped, reject bad/05 05 samples, retain last state on unknown, and use history only for the code while the relay indicates an active fault. It must not affect write permissions or physical controls. Owner then required a consolidated change summary and explicit OK before pushing to GitHub. No push, release or installation until that OK.
+
+## Publication approved — 13 November 2026
+
+After reviewing the local changes and measured-room display mapping, the owner explicitly approved push/publication of 0.2.15 and returning to the normal workflow. This lifts the earlier publication hold. Standing commit/push/publication authorization resumes; do not ask repeatedly. Indigo installation remains owner-managed through GitHub downloads. The temporary restart monitor was stopped and its capture archived to avoid competing with the new persistent optical owner.

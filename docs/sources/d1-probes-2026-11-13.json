@@ -1,0 +1,50 @@
+[
+  {
+    "command": "getSystemTime",
+    "response": "2026-11-13T14:36:25+0000",
+    "release": "/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0 closed",
+    "utc": "2026-11-13T13:47:19.897092+00:00"
+  },
+  {
+    "command": "getProbeBurnerFault",
+    "response": "00",
+    "release": "/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0 closed",
+    "utc": "2026-11-13T13:47:24.977544+00:00"
+  },
+  {
+    "command": "getProbeProductionStatus",
+    "response": "00",
+    "release": "/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0 closed",
+    "utc": "2026-11-13T13:47:37.290568+00:00"
+  },
+  {
+    "command": "getProbeRelayStatus",
+    "response": "83 80",
+    "release": "/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0 closed",
+    "utc": "2026-11-13T13:47:42.377382+00:00"
+  },
+  {
+    "command": "getProbeAlarmHeader",
+    "response": "00",
+    "release": "/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0 closed",
+    "utc": "2026-11-13T13:47:54.688590+00:00"
+  },
+  {
+    "command": "getStatusStoerung",
+    "response": "UNKNOWN",
+    "release": "/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0 closed",
+    "utc": "2026-11-13T13:47:59.769577+00:00"
+  },
+  {
+    "command": "getError0",
+    "response": "2026-11-13T14:30:08+0000 Burner Fault (D1)",
+    "release": "/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0 closed",
+    "utc": "2026-11-13T13:48:12.285900+00:00"
+  },
+  {
+    "command": "getSystemTime",
+    "response": "2026-11-13T14:37:23+0000",
+    "release": "/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0 closed",
+    "utc": "2026-11-13T13:48:17.394915+00:00"
+  }
+]

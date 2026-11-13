@@ -1,0 +1,59 @@
+[
+  {
+    "kind": "fault",
+    "result": {
+      "values": {},
+      "errors": {},
+      "tcp_available": true,
+      "release_error": "",
+      "simulator": false,
+      "live_identity": true,
+      "optical_activity": "Unavailable",
+      "optical_error": "",
+      "optical_checked": false,
+      "verified_active_fault_code": "",
+      "system_time": "2026-11-13T14:52:46+0000",
+      "health_ok": true,
+      "health_error": "",
+      "health_checked": "2026-11-13T14:03:40+00:00",
+      "health_only": true,
+      "fault_only": true,
+      "fault_record": "2026-11-13T14:30:08+0000 Burner Fault (D1)",
+      "relay_status": "83 80",
+      "fault_checked": "2026-11-13T14:03:44+00:00",
+      "fault_error": ""
+    }
+  },
+  {
+    "kind": "poll",
+    "result": {
+      "values": {
+        "boilerTemp": 51.5,
+        "outsideTemp": 18.6,
+        "roomSetpoint": 23.0,
+        "warmWaterTemp": 53.700001,
+        "roomMeasuredTemp": 20.9
+      },
+      "errors": {},
+      "tcp_available": true,
+      "release_error": "",
+      "simulator": false,
+      "live_identity": true,
+      "optical_activity": "Unavailable",
+      "optical_error": "",
+      "optical_checked": false,
+      "verified_active_fault_code": "",
+      "system_time": "2026-11-13T14:52:46+0000",
+      "health_ok": true,
+      "health_error": "",
+      "health_checked": "2026-11-13T14:03:40+00:00",
+      "health_only": false,
+      "fault_only": false,
+      "fault_record": "",
+      "relay_status": "",
+      "fault_checked": "",
+      "fault_error": ""
+    },
+    "same_socket": true
+  }
+]

@@ -1,0 +1,23 @@
+{
+  "values": {},
+  "errors": {},
+  "tcp_available": true,
+  "release_error": "",
+  "simulator": false,
+  "live_identity": true,
+  "optical_activity": "Unavailable",
+  "optical_error": "",
+  "optical_checked": false,
+  "verified_active_fault_code": "",
+  "active_fault_known": false,
+  "system_time": "",
+  "health_ok": false,
+  "health_error": "Invalid controller time: ERR: <RECV: read error 11\n>FRAMER: read failure\nError in recv, terminating\nError executing getSystemTime",
+  "health_checked": "",
+  "health_only": true,
+  "fault_only": true,
+  "fault_record": "",
+  "relay_status": "",
+  "fault_checked": "",
+  "fault_error": "Invalid controller time: ERR: <RECV: read error 11\n>FRAMER: read failure\nError in recv, terminating\nError executing getSystemTime"
+}

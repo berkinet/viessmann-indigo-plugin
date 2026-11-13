@@ -35,3 +35,7 @@ The owner's Vitodata screenshot already shows a measured A1/M1 room temperature 
 ## Deferred validation after repair
 
 Start with the existing 0896 candidate and raw bytes, comparing repeatedly with the actual wall controller/room display (and allowing for filtering). Check that the value follows real temperature rather than the selected target. Do not change setpoints merely to test this. Preserve sentinels and reject fixed defaults or unsupported responses. If unsuccessful, use complete controller/remote identification and device-definition evidence to prioritize alternatives; do not indiscriminately scan registers or claim cross-family addresses as supported. Keep the current heater display source provisional until a measured-room read is verified.
+
+## Live confirmation — 13 November 2026
+
+The installed KO2B returned measured room temperature at 0896 through getProbeRoomTemp: 20.6 C, then 20.7 C. The owner independently confirmed the same change on the room display. This upgrades 0896/2 with UT decoding from candidate to verified measured room temperature for this installation. Companion sensor-status 089C returned 00, but its enum remains undecoded. See live-probes-2026-11-13.md for raw evidence and limits. No plugin display/poll mapping was changed by this research.

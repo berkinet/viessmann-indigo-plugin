@@ -1,0 +1,18 @@
+[
+  {
+    "attempt": 1,
+    "identity": "V200KO2B (ID=209F) (Protocol=KW2)",
+    "requested_utc": "2026-11-13T13:44:24.250308+00:00",
+    "response": "2026-11-13T14:33:33+0000",
+    "seconds": 2.733,
+    "release": "/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0 closed"
+  },
+  {
+    "attempt": 2,
+    "identity": "V200KO2B (ID=209F) (Protocol=KW2)",
+    "requested_utc": "2026-11-13T13:44:30.051410+00:00",
+    "response": "2026-11-13T14:33:45+0000",
+    "seconds": 9.262,
+    "release": "/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0 closed"
+  }
+]

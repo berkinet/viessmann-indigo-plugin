@@ -1,0 +1,148 @@
+getStorageTemp: Storage tank temperature in degrees C
+getProbeFlowA1: Candidate A1 flow temperature; OpenV 209F table; unverified
+getProbeStorage: Candidate filtered storage temperature; OpenV 209F table; unverified
+getProbeBurner1: Candidate burner stage 1; raw byte; unverified
+getProbeProgram: Candidate operating program; raw byte; do not use legacy BA mapping
+getProbeCurveLevel: Candidate heating curve shift; raw byte; signed decoding unverified
+getProbeCurveSlope: Candidate heating curve slope; raw byte; wiki suggests divide by 10
+getProbeSolarDay: Candidate solar daily yield; raw bytes; only relevant with solar hardware
+getProbeStarts: Candidate four-byte burner starts; raw bytes; compare with existing two-byte read
+getProbeRoomTemp: LOW CONFIDENCE measured room temperature candidate from 20CB example; not verified for 209F
+getProbeRoomSensorStatus: KO2B room sensor status; enumeration unverified
+getProbeProductionStatus: KO2B production state first byte; layout unverified
+getProbeRelayStatus: KO2B relay state first two bytes; bit layout unverified
+getProbeAlarmHeader: KO2B alarm header first byte; layout unverified
+getProbeBurnerFault: Cross-model burner fault candidate; applicability unverified
+getOutsideTemp: Outside temperature in degrees C
+getBoilerTemp: Boiler temperature in degrees C
+getWaterTemp: Hot water temperature in degrees C
+getExhaustTemp: Exhaust temperature in degrees C
+getTemp17A: Return temperature 17A in degrees C
+getTemp17B: Flow temperature 17B in degrees C
+getTempWWsoll: Ermittle die Warmwassersolltemperatur in Grad C
+getTempKsoll: Ermittle die Kesselsolltemperatur in Grad C
+getTempVListM2: Ermittle die Vorlauftemperatur M2 in Grad C
+getTempVLsollM1: Ermittle die Vorlaufsolltemperatur M1 in Grad C
+getTempVLsollM2: Ermittle die Vorlaufsolltemperatur M2 in Grad C
+getTempVLsollM3: Ermittle die Vorlaufsolltemperatur M3 in Grad C
+getTempKol: Ermittle die Kollektortemperatur in Grad C
+getTempSpu: Ermittle die Speichertemperatur unten in Grad C
+getRoomTempSP: Room temperature in degrees C
+setTempRaumNorSollM1: Setze die Raumsolltemperatur normal M1 in Grad C
+getTempRaumNorSollM2: Ermittle die Raumsolltemperatur normal M2 in Grad C
+getTempRaumRedSollM1: Ermittle die Raumsolltemperatur reduziert M1 in Grad C
+setTempRaumRedSollM1: Setze die Raumsolltemperatur reduziert M1 in Grad C
+getTempRaumRedSollM2: Ermittle die Raumsolltemperatur reduziert M2 in Grad C
+getBrennerStatus: Ermittle den Brennerstatus
+getBurnerStarts: Burner Starts
+getBurnerHours1: Burner hours Level 1
+getBurnerHours2: Burner hours Level 2
+getPumpStatus: Pump  Status
+getPumpStatusSp: Status of the storage tank charging pump
+getCircPumpStatus: Status of the circulation pump
+getSolarPumpStatus: Status of the solar pump
+getPumpeStatusM2: Ermittle den Status der Pumpe M2
+getBurnerOutput: Burner output 0 to 100%
+getMixerPosition1: Mixer position 
+getMixerPosition2: Mixer position 2 
+getThrottlePosition: Throttle poition
+getSolarStatusWW: Ermittle den Status der Nachladeunterdrueckung
+getTimerM1Mo: Schaltzeit Montag M1
+getTimerM1Di: Schaltzeit Dienstag M1
+getTimerM1Mi: Schaltzeit MIttwoch M1
+getTimerM1Do: Schaltzeit Donnerstag M1
+getTimerM1Fr: Schaltzeit Freitag M1
+getTimerM1Sa: Schaltzeit Samstag M1
+getTimerM1So: Schaltzeit Sonntag M1
+getTimerM2Mo: Schaltzeit Montag M2
+getTimerM2Di: Schaltzeit Dienstag M2
+getTimerM2Mi: Schaltzeit Mittwoch M2
+getTimerM2Do: Schaltzeit Donnerstag M2
+getTimerM2Fr: Schaltzeit Freitag M2
+getTimerM2Sa: Schaltzeit Samstag M2
+getTimerM2So: Schaltzeit Sonntag M2
+getTimerWWMo: Schaltzeit Montag Warmwasser
+getTimerWWDi: Schaltzeit Dienstag Warmwasser
+getTimerWWMi: Schaltzeit Mittwoch Warmwasser
+getTimerWWDo: Schaltzeit Donnerstag Warmwasser
+getTimerWWFr: Schaltzeit Freitag Warmwasser
+getTimerWWSa: Schaltzeit Samstag Warmwasser
+getTimerWWSo: Schaltzeit Sonntag Warmwasser
+getTimerZirkuMo: Schaltzeit Montag Zirku
+getTimerZirkuDi: Schaltzeit Dienstag Zirku
+getTimerZirkuMi: Schaltzeit Mittwoch Zirku
+getTimerZirkuDo: Schaltzeit Donnerstag Zirku
+getTimerZirkuFr: Schaltzeit Freitag Zirku
+getTimerZirkuSa: Schaltzeit Samstag Zirku
+getTimerZirkuSo: Schaltzeit Sonntag Zirku
+getCurrentMode: Current mode 1
+getCurrentMode2: Current mode 2
+getSavingMode1: Saving mode 1 status
+getSavingMode2: Saving mode 2 status
+getPartyMode1: Party mode 1 status
+getPartyMode2: Party mode 2 status
+getSolarStunden: Solar Betriebsstunden
+getSolarLeistung: Solar Leistung Gesamt
+getStatusFrost1: Status Frost warning 1
+getStatusFrost2: Status Frost warning 2
+getOilUsage: Oil Usage
+getStatusStoerung: Status Sammelstoerung
+getTempPartyM1: Solltemperatur Partybetrieb M1
+getTempPartyM2: Solltemperatur Partybetrieb M2
+getSystemTime: Ermittle Systemzeit
+setSystemTime: Setze Systemzeit
+setTempWWsoll: Setze die Warmwassersolltemperatur in Grad C
+setTempPartyM1: Setze die Warmwassersolltemperatur Party M1 in Grad C
+setTempPartyM2: Setze die Warmwassersolltemperatur Party M2 in Grad C
+setBetriebArtM1: Setze Betriebsart M1
+setBetriebSparM1: Setze Betriebsart Spar M1
+setBetriebPartyM1: Setze Betriebsart Party M1
+setBetriebPartyM2: Setze Betriebsart Party M2
+setPumpeStatusZirku: Setze den Status der Zirkulationspumpe
+setTimerM1Mo: Schaltzeit Montag M1
+setTimerM1Di: Schaltzeit Dienstag M1
+setTimerM1Mi: Schaltzeit Mittwoch M1
+setTimerM1Do: Schaltzeit Donnerstag M1
+setTimerM1Fr: Schaltzeit Freitag M1
+setTimerM1Sa: Schaltzeit Samstag M1
+setTimerM1So: Schaltzeit Sonntag M1
+setTimerM2Mo: Schaltzeit Montag M2
+setTimerM2Di: Schaltzeit Dienstag M2
+setTimerM2Mi: Schaltzeit Mittwoch M2
+setTimerM2Do: Schaltzeit Donnerstag M2
+setTimerM2Fr: Schaltzeit Freitag M2
+setTimerM2Sa: Schaltzeit Samstag M2
+setTimerM2So: Schaltzeit Sonntag M2
+setTimerWWMo: Schaltzeit Montag Warmwasser
+setTimerWWDi: Schaltzeit Dienstag Warmwasser
+setTimerWWMi: Schaltzeit Mittwoch Warmwasser
+setTimerWWDo: Schaltzeit Donnerstag Warmwasser
+setTimerWWFr: Schaltzeit Freitag Warmwasser
+setTimerWWSa: Schaltzeit Samstag Warmwasser
+setTimerWWSo: Schaltzeit Sonntag Warmwasser
+setTimerZirkuMo: Schaltzeit Montag Zirku
+setTimerZirkuDi: Schaltzeit Dienstag Zirku
+setTimerZirkuMi: Schaltzeit Mittwoch Zirku
+setTimerZirkuDo: Schaltzeit Donnerstag Zirku
+setTimerZirkuFr: Schaltzeit Freitag Zirku
+setTimerZirkuSa: Schaltzeit Samstag Zirku
+setTimerZirkuSo: Schaltzeit Sonntag Zirku
+getError0: Ermittle Fehlerhistory Eintrag 1
+getError1: Ermittle Fehlerhistory Eintrag 2
+getError2: Ermittle Fehlerhistory Eintrag 3
+getError3: Ermittle Fehlerhistory Eintrag 4
+getError4: Ermittle Fehlerhistory Eintrag 5
+getError5: Ermittle Fehlerhistory Eintrag 6
+getError6: Ermittle Fehlerhistory Eintrag 7
+getError7: Ermittle Fehlerhistory Eintrag 8
+getError8: Ermittle Fehlerhistory Eintrag 9
+getError9: Ermittle Fehlerhistory Eintrag 10
+getNeigungM1: Ermittle Neigung Heizkennlinie M1
+getNeigungM2: Ermittle Neigung Heizkennlinie M2
+getNiveauM1: Ermittle Niveau Heizkennlinie M1
+getNiveauM2: Ermittle Niveau Heizkennlinie M2
+setNeigungM1: Setze Neigung Heizkennlinie M1
+setNeigungM2: Setze Neigung Heizkennlinie M2
+setNiveauM1: Setze Niveau Heizkennlinie M1
+setNiveauM2: Setze Niveau Heizkennlinie M2
+getDevType: Ermittle Device Typ der Anlage

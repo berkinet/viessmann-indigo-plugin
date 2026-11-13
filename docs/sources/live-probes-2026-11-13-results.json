@@ -1,0 +1,26 @@
+[
+  {
+    "utc": "2026-11-13T13:35:44.567186+00:00",
+    "address": "0802",
+    "length": 2,
+    "name": "boiler baseline",
+    "response": "Result: 05 05",
+    "seconds": 9.86
+  },
+  {
+    "utc": "2026-11-13T13:35:52.778973+00:00",
+    "address": "0896",
+    "length": 2,
+    "name": "room A1",
+    "response": "Result: 05 05",
+    "seconds": 8.21
+  },
+  {
+    "utc": "2026-11-13T13:36:07.784519+00:00",
+    "address": "089C",
+    "length": 1,
+    "name": "room sensor status",
+    "response": "TimeoutError: timed out",
+    "seconds": 15.0
+  }
+]
