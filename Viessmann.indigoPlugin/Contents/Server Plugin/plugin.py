@@ -15,6 +15,14 @@ class Plugin(indigo.PluginBase):
         self.system_id = None
         self.unavailable = {}
 
+    def closedPrefsConfigUi(self, valuesDict, userCancelled):
+        if not userCancelled:
+            self.pluginPrefs.update(valuesDict)
+            self.events.put(('preferences', None))
+
+    def _live_writes_enabled(self):
+        return self.pluginPrefs.get('liveWritesEnabled', False) in (True, 'true', 'True')
+
     def deviceStartComm(self, dev):
         # Migrate existing devices too; a new XML default alone does not update saved props.
         if dev.pluginProps.get('SupportsStatusRequest') is not True:
@@ -86,17 +94,20 @@ class Plugin(indigo.PluginBase):
             current_target = dev.pluginProps.get('roomTarget', 'standard') if dev.deviceTypeId == 'viessmannHeater' else 'dhw'
             if current_target != target or str(dev.pluginProps.get('systemId', '')) != str(self.system_id):
                 raise ValueError('Selected target or parent changed before action')
-            if not dev.states.get('dataValid', False) or not dev.states.get('simulator', False):
-                raise ValueError('A valid simulator reading is required before editing')
+            simulated = dev.states.get('simulator', False)
+            if not dev.states.get('dataValid', False):
+                raise ValueError('A valid current reading is required before editing')
+            if not simulated and (not self._live_writes_enabled() or target not in ('standard', 'dhw')):
+                raise ValueError('Live setpoint writes are disabled for this target')
             value = float(requested)
             if kind != 'set':
                 base = float(dev.states['setpointHeat'])
                 value = base + value if kind == 'increase' else base - value
-            actual = self.manager.write_simulated(target, value, self.closing.is_set)
+            actual = self.manager.write_setpoint(target, value, self.closing.is_set)
             # Publish only confirmed readback; the following full cycle refreshes all states.
             dev.updateStatesOnServer([{'key': 'setpointHeat', 'value': actual},
                                       {'key': 'roomSetpoint' if target != 'dhw' else 'dhwSetpoint', 'value': actual},
-                                      {'key': 'actionStatus', 'value': 'Simulator readback confirmed'}])
+                                      {'key': 'actionStatus', 'value': 'Simulator readback confirmed' if simulated else 'Live readback confirmed'}])
         except (OSError, ValueError, KeyError, TypeError) as exc:
             dev.updateStatesOnServer([{'key': 'actionStatus', 'value': str(exc)}])
             self.logger.warning('Thermostat action rejected/failed: %s', exc)
@@ -224,7 +235,11 @@ class Plugin(indigo.PluginBase):
             if dev.deviceTypeId != 'viessmannSystem':
                 target = dev.pluginProps.get('roomTarget', 'standard')
                 target_key = 'roomSetpoint' if dev.deviceTypeId == 'viessmannHeater' else 'dhwSetpoint'
-                writable = result.simulator and valid and target_key in result.values
+                live_allowed = (self._live_writes_enabled() and result.live_identity
+                                and not result.errors and not result.release_error
+                                and (set(('boilerTemp', 'outsideTemp', 'roomSetpoint', 'warmWaterTemp', 'dhwSetpoint')) <= set(result.values))
+                                and (target == 'standard' or dev.deviceTypeId == 'viessmannWaterHeater'))
+                writable = (result.simulator or live_allowed) and valid and target_key in result.values
                 self._native_capabilities(dev, result.simulator, writable)
                 if dev.deviceTypeId == 'viessmannHeater':
                     updates.append({'key': 'selectedTarget', 'value': target.title()})
@@ -258,6 +273,15 @@ class Plugin(indigo.PluginBase):
                 action, device_id = self.events.get_nowait()
             except queue.Empty:
                 break
+            if action == 'preferences':
+                self._configure()
+                self.manager.request_poll()
+                if not self._live_writes_enabled():
+                    for ident in self.active:
+                        child = self._device(ident)
+                        if child and child.deviceTypeId != 'viessmannSystem' and not child.states.get('simulator', False):
+                            self._native_capabilities(child, False, False)
+                continue
             if action == 'refresh':
                 self._configure()
                 dev = self._device(device_id)
@@ -304,7 +328,8 @@ class Plugin(indigo.PluginBase):
         system = systems[0]
         self.system_id = system.id
         try:
-            settings = self.settings(system.pluginProps)
+            from dataclasses import replace
+            settings = replace(self.settings(system.pluginProps), live_writes=self._live_writes_enabled())
         except (ValueError, TypeError):
             self.manager.close()
             self.manager.settings = None

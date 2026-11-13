@@ -1,4 +1,4 @@
-"""Single-owner, read-only vcontrold polling; independent of Indigo."""
+"""Single-owner vcontrold polling and explicitly authorized setpoints; independent of Indigo."""
 from dataclasses import dataclass, field
 import math
 import re
@@ -12,6 +12,8 @@ TARGETS = {'standard': ('getRoomTempSP', 'setTempRaumNorSollM1'),
            'reduced': ('getTempRaumRedSollM1', 'setTempRaumRedSollM1'),
            'party': ('getTempPartyM1', 'setTempPartyM1'),
            'dhw': ('getTempWWsoll', 'setTempWWsoll')}
+LIVE_ID = 'V200KO2B (ID=209F) (Protocol=KW2)'
+LIVE_TARGETS = {'standard', 'dhw'}
 SIMULATOR_ID = 'SIMULATOR_209F (ID=209F) (Protocol=KW2)'
 TEMPERATURE = re.compile(r'([+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+))(?:[ \t]*(?:°?C))?')
 
@@ -35,6 +37,7 @@ class Settings:
     enabled: bool = False
     target: str = "standard"
     activity_probe: bool = True
+    live_writes: bool = False
 
     def __post_init__(self):
         if self.target not in ('standard', 'reduced', 'party'):
@@ -54,6 +57,7 @@ class Result:
     tcp_available: bool = False
     release_error: str = ''
     simulator: bool = False
+    live_identity: bool = False
     optical_activity: str = 'Unavailable'
     optical_error: str = ''
     optical_checked: bool = False
@@ -155,6 +159,7 @@ class Client:
                 try:
                     identity = self._exchange('device', cancelled)
                     result.simulator = identity == SIMULATOR_ID
+                    result.live_identity = identity == LIVE_ID
                     self._activity_probe(result, identity, cancelled)
                 except (OSError, ValueError, UnicodeError):
                     self.disconnect()
@@ -163,6 +168,8 @@ class Client:
                 reads['roomSetpoint'] = TARGETS[self.settings.target][0]
                 if result.simulator:
                     reads.update(roomMeasuredTemp='getProbeRoomTemp', dhwSetpoint='getTempWWsoll')
+                if result.live_identity and self.settings.live_writes:
+                    reads['dhwSetpoint'] = 'getTempWWsoll'
                 for key, command in reads.items():
                     try:
                         response = self._exchange(command, cancelled)
@@ -192,21 +199,35 @@ class Client:
         return result
 
 
-    def write_simulated(self, target, value, cancelled=lambda: False):
-        """No physical writes: fresh identity check, bounded setter, then real readback."""
+    def write_setpoint(self, target, value, cancelled=lambda: False):
+        """Fresh endpoint identity, explicit live opt-in, one setter and readback; no retries."""
         if target not in TARGETS:
             raise ValueError('Unknown target')
         number = float(value)
         low, high = (10, 60) if target == 'dhw' else (3, 37)
         if not math.isfinite(number) or not number.is_integer() or not low <= number <= high:
-            raise ValueError('Simulator target must be a whole degree from %s to %s' % (low, high))
+            raise ValueError('Target must be a whole degree from %s to %s' % (low, high))
         try:
             if self.sock is None:
                 self.sock = socket.create_connection((self.settings.host, self.settings.port), min(5, self.settings.timeout))
                 self._frame(cancelled)
             # Check on this exact connection immediately before the one permitted write.
-            if self._exchange('device', cancelled) != SIMULATOR_ID:
-                raise PermissionError('Setpoint writes are enabled only on the marked simulator')
+            identity = self._exchange('device', cancelled)
+            if identity != SIMULATOR_ID:
+                if not self.settings.live_writes or identity != LIVE_ID or target not in LIVE_TARGETS:
+                    raise PermissionError('Live writes require opt-in, verified KO2B identity and an allowed target')
+                # Single-byte reads can mistake an ENQ byte for a plausible target.
+                # Require a fresh complete snapshot, including multi-byte temperatures.
+                snapshot = self.poll(cancelled)
+                required = set(READS) | {'dhwSetpoint'}
+                if (not snapshot.live_identity or snapshot.errors or snapshot.release_error
+                        or not required.issubset(snapshot.values)):
+                    raise PermissionError('Live write blocked: fresh complete readings are required')
+                current = snapshot.values['dhwSetpoint' if target == 'dhw' else 'roomSetpoint']
+                if not low <= current <= high:
+                    raise PermissionError('Live write blocked: existing target is outside allowed bounds')
+                if self._exchange('device', cancelled) != LIVE_ID:
+                    raise PermissionError('Controller identity changed before write')
             if cancelled():
                 raise InterruptedError('Cancelled before write')
             read, setter = TARGETS[target]
@@ -216,7 +237,7 @@ class Client:
                 raise ValueError('Setter did not return OK; result uncertain, not retried')
             actual = temperature(self._exchange(read, cancelled))
             if actual != number:
-                raise ValueError('Setpoint readback mismatch')
+                raise ValueError('Setpoint readback mismatch; result uncertain, not retried')
             response = self._exchange('close', cancelled)
             if not response.endswith(' closed') or 'ERR:' in response:
                 raise ValueError('Optolink release failed after write')
@@ -258,12 +279,12 @@ class Manager:
         self.due = self.clock() + self.settings.interval
         return result
 
-    def write_simulated(self, target, value, cancelled=lambda: False):
+    def write_setpoint(self, target, value, cancelled=lambda: False):
         if self.settings is None or not self.settings.enabled:
-            raise PermissionError('Polling must be enabled to use simulator controls')
+            raise PermissionError('Polling must be enabled to use setpoint controls')
         if self.client is None:
             self.client = self.client_factory(self.settings)
-        actual = self.client.write_simulated(target, value, cancelled)
+        actual = self.client.write_setpoint(target, value, cancelled)
         self.due = self.clock()
         return actual
 

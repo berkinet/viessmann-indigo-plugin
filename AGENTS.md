@@ -47,3 +47,7 @@ The owner states the heater must stay off pending repair (reported 6 November 20
 ## Nameplate-confirmed controller identity
 
 On 8 November 2026 the owner supplied a photograph identifying the installed controller as **Viessmann Vitotronic 200, type KO2B**. Use KO2B for model-specific research; earlier KO1B/KO2B wording describes the broader family. This is the controller identification, not evidence of the boiler/burner model, firmware revision or supported protocol commands. Source image: `/Users/rdp/Desktop/Screenshots/Screenshot 2026-11-08 at 14.01.46.png`.
+
+## Owner-authorized live-write opt-in (0.2.12)
+
+On 13 November the owner requested live standard-room and DHW writes selectable in plugin configuration, superseding the earlier blanket simulator-only rule for those two targets only. Default remains off. Require exact KO2B identity, a fresh complete error-free snapshot, bounded whole-degree target, acknowledgement and matching readback; no retries of uncertain writes. Reduced/party remain simulator-only. The first unchanged live setter validation failed acknowledgement; physical write effectiveness is still unverified. See docs/thermostat-trial.md. Never enable the preference on the owner's behalf or interpret the feature as permission for unrelated writes.

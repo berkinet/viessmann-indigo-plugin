@@ -24,6 +24,9 @@ class FixtureServer(socketserver.ThreadingTCPServer):
         self.stall = stall
         self.close_reply = close_reply
         self.activity_reply = 'Result: 05'
+        self.targets = {'getRoomTempSP': '19', 'getTempWWsoll': '50'}
+        self.setter_reply = 'OK'
+        self.apply_setter = True
         self.identity = "V200KO2B (ID=209F) (Protocol=KW2)"
         owner = self
 
@@ -56,6 +59,13 @@ class FixtureServer(socketserver.ThreadingTCPServer):
                             reply = owner.activity_reply + '\nvctrld> '
                         elif command == 'device':
                             reply = owner.identity + '\nvctrld> '
+                        elif command.startswith(('setTempRaumNorSollM1 ', 'setTempWWsoll ')):
+                            setter, value = command.split()
+                            read = 'getRoomTempSP' if setter == 'setTempRaumNorSollM1' else 'getTempWWsoll'
+                            if owner.apply_setter: owner.targets[read] = value
+                            reply = owner.setter_reply + '\nvctrld> '
+                        elif command == 'getTempWWsoll' or (command == 'getRoomTempSP' and any(c.startswith('setTempRaumNorSollM1 ') for c in owner.commands)):
+                            reply = owner.targets[command] + '\nvctrld> '
                         elif command == 'close':
                             reply = (owner.close_reply or '/dev/test closed') + '\nvctrld> '
                         else:
@@ -198,13 +208,42 @@ class TransportTests(unittest.TestCase):
         client = Client(server.settings())
         try:
             with self.assertRaises(PermissionError):
-                client.write_simulated('standard', 21)
+                client.write_setpoint('standard', 21)
             self.assertEqual(server.commands, ['device'])
             self.assertIsNone(client.sock)
             for target, value in [('standard', 38), ('standard', 20.5), ('dhw', 9), ('bogus', 20)]:
                 with self.subTest(target=target, value=value), self.assertRaises(ValueError):
-                    client.write_simulated(target, value)
+                    client.write_setpoint(target, value)
             self.assertEqual(server.commands, ['device'])
+        finally:
+            client.disconnect(); server.stop()
+
+    def test_live_write_opt_in_identity_target_and_readback(self):
+        server = FixtureServer()
+        client = Client(server.settings(live_writes=True))
+        try:
+            self.assertEqual(client.write_setpoint('standard', 21), 21)
+            self.assertEqual(client.write_setpoint('dhw', 51), 51)
+            for target in ('reduced', 'party'):
+                with self.assertRaises(PermissionError): client.write_setpoint(target, 20)
+            server.identity = 'V200KW2 (ID=2098) (Protocol=KW2)'
+            with self.assertRaises(PermissionError): client.write_setpoint('dhw', 50)
+            server.identity = 'V200KO2B (ID=209F) (Protocol=KW2)'
+            server.answers[0] = 'ERR: Wrong result'
+            before = len(server.commands)
+            with self.assertRaisesRegex(PermissionError, 'complete readings'):
+                client.write_setpoint('standard', 22)
+            self.assertFalse(any(c.startswith('set') for c in server.commands[before:]))
+            server.answers[0] = '27.4'
+            server.apply_setter = False
+            before = len(server.commands)
+            with self.assertRaisesRegex(ValueError, 'mismatch'):
+                client.write_setpoint('dhw', 52)
+            self.assertEqual(server.commands[before:].count('setTempWWsoll 52'), 1)
+            self.assertIsNone(client.sock)
+            server.setter_reply = 'ERR: failed'
+            with self.assertRaisesRegex(ValueError, 'uncertain'):
+                client.write_setpoint('dhw', 52)
         finally:
             client.disconnect(); server.stop()
 
@@ -294,7 +333,7 @@ class AdapterTests(unittest.TestCase):
     def setUp(self):
         stub = types.ModuleType('indigo')
         class Base:
-            def __init__(self, ident, *args): self.pluginId = ident
+            def __init__(self, ident, *args): self.pluginId = ident; self.pluginPrefs = dict(args[-1])
         stub.PluginBase = Base; stub.Dict = dict; stub.devices = Devices()
         stub.kUniversalAction = types.SimpleNamespace(RequestStatus=1)
         stub.kThermostatAction = types.SimpleNamespace(SetHeatSetpoint=1, IncreaseHeatSetpoint=2, DecreaseHeatSetpoint=3)
@@ -354,6 +393,31 @@ class AdapterTests(unittest.TestCase):
         self.assertFalse(heater.pluginProps['SupportsHeatSetpoint'])
         self.assertEqual(heater.pluginProps['NumTemperatureInputs'], 1)
 
+    def test_live_preference_controls_capabilities_and_revokes_queued_actions(self):
+        self.devices[1].pluginProps['pollingEnabled'] = True
+        values = dict(zip(READS, (66, -3, 20, 46)))
+        values['dhwSetpoint'] = 50
+        result = Result(values=values, tcp_available=True, live_identity=True)
+        self.plugin._publish(result)
+        self.assertFalse(self.devices[2].pluginProps['SupportsHeatSetpoint'])
+        self.plugin.closedPrefsConfigUi({'liveWritesEnabled': True}, False)
+        self.plugin._process_events()
+        self.assertTrue(self.plugin.manager.settings.live_writes)
+        self.plugin._publish(result)
+        self.assertTrue(self.devices[2].pluginProps['SupportsHeatSetpoint'])
+        self.assertTrue(self.devices[3].pluginProps['SupportsHeatSetpoint'])
+        self.devices[2].pluginProps['roomTarget'] = 'party'
+        self.plugin._publish(result)
+        self.assertFalse(self.devices[2].pluginProps['SupportsHeatSetpoint'])
+        self.devices[2].pluginProps['roomTarget'] = 'standard'
+        calls = []
+        self.plugin.manager.write_setpoint = lambda *args: calls.append(args)
+        self.plugin.actionControlThermostat(types.SimpleNamespace(thermostatAction=1, actionValue=22), self.devices[2])
+        self.plugin.closedPrefsConfigUi({'liveWritesEnabled': False}, False)
+        self.plugin._process_events()
+        self.assertFalse(calls)
+        self.assertFalse(self.devices[3].pluginProps['SupportsHeatSetpoint'])
+
     def test_queued_target_change_rejects_write_and_relative_actions_use_readback(self):
         self.devices[1].pluginProps['pollingEnabled'] = True
         self.plugin._configure()
@@ -364,7 +428,7 @@ class AdapterTests(unittest.TestCase):
         def write(target, value, cancelled):
             calls.append((target, value))
             return value
-        self.plugin.manager.write_simulated = write
+        self.plugin.manager.write_setpoint = write
         dev = self.devices[2]
         self.plugin.actionControlThermostat(types.SimpleNamespace(thermostatAction=2, actionValue=1), dev)
         self.plugin.actionControlThermostat(types.SimpleNamespace(thermostatAction=2, actionValue=1), dev)

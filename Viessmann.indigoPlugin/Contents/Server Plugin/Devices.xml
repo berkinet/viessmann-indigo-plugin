@@ -140,7 +140,7 @@
         </List>
       </Field>
       <Field id="thermostatHelp" type="label">
-        <Label>Native setpoint controls work only with the marked simulator. Real boiler writes are disabled. Selecting a target does not activate party mode or change the boiler program.</Label>
+        <Label>Live standard-room setpoint controls require opt-in in plugin configuration. Reduced and party writes remain simulator-only. Selecting a target does not activate party mode or change the boiler program.</Label>
       </Field>
       <Field id="SupportsStatusRequest" type="checkbox" defaultValue="true" hidden="true" />
     </ConfigUI>
@@ -234,7 +234,7 @@
       <Field id="SupportsHvacFanMode" type="checkbox" defaultValue="false" hidden="true" />
       <Field id="ShowCoolHeatEquipmentStateUI" type="checkbox" defaultValue="false" hidden="true" />
       <Field id="thermostatHelp" type="label">
-        <Label>Native setpoint controls work only with the marked simulator. Real boiler writes are disabled. Selecting a target does not activate party mode or change the boiler program.</Label>
+        <Label>Live DHW setpoint controls require opt-in in plugin configuration.</Label>
       </Field>
       <Field id="SupportsStatusRequest" type="checkbox" defaultValue="true" hidden="true" />
     </ConfigUI>

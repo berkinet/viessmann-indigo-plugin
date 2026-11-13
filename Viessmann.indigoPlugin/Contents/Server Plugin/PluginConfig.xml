@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PluginConfig>
+  <Field id="liveWritesEnabled" type="checkbox" defaultValue="false">
+    <Label>Enable live room and hot-water setpoint writes</Label>
+  </Field>
   <Field id="configurationHelp" type="label">
-    <Label>Configure the connection and polling interval on your Viessmann system device. Select that system as the parent of the heater and water heater devices. This version reads data only; polling starts disabled.</Label>
+    <Label>Live writes support the standard room target (3–37 C) and DHW target (10–60 C), whole degrees only, on the verified KO2B/209F endpoint. Polling must be enabled and readings valid. Each write requires acknowledgement and readback; uncertain writes are not retried. Reduced/party writes remain simulator-only. Connection and polling settings are on the system device.</Label>
   </Field>
 </PluginConfig>
