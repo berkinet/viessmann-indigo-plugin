@@ -1,0 +1,56 @@
+<?xml version='1.0' encoding='utf-8'?>
+<commands>
+  <command name="getHolidayStart" protocmd="getaddr">
+    <description>KO2B holiday diagnostic; catalog-supported candidate; testing</description>
+    <device ID="209F">
+      <addr>2309</addr>
+      <len>8</len>
+      <unit>TI</unit>
+    </device>
+  </command>
+  <command name="setHolidayStart" protocmd="setaddr">
+    <description>KO2B holiday diagnostic; setter transport not yet validated</description>
+    <device ID="209F">
+      <addr>2309</addr>
+      <len>8</len>
+      <unit>TI</unit>
+    </device>
+  </command>
+  <command name="getHolidayEnd" protocmd="getaddr">
+    <description>KO2B holiday diagnostic; catalog-supported candidate; testing</description>
+    <device ID="209F">
+      <addr>2311</addr>
+      <len>8</len>
+      <unit>TI</unit>
+    </device>
+  </command>
+  <command name="setHolidayEnd" protocmd="setaddr">
+    <description>KO2B holiday diagnostic; setter transport not yet validated</description>
+    <device ID="209F">
+      <addr>2311</addr>
+      <len>8</len>
+      <unit>TI</unit>
+    </device>
+  </command>
+  <command name="getProbeHolidayStartRaw" protocmd="getaddr">
+    <description>KO2B holiday diagnostic; catalog-supported candidate; testing</description>
+    <device ID="209F">
+      <addr>2309</addr>
+      <len>8</len>
+    </device>
+  </command>
+  <command name="getProbeHolidayEndRaw" protocmd="getaddr">
+    <description>KO2B holiday diagnostic; catalog-supported candidate; testing</description>
+    <device ID="209F">
+      <addr>2311</addr>
+      <len>8</len>
+    </device>
+  </command>
+  <command name="getProbeHolidayActiveRaw" protocmd="getaddr">
+    <description>KO2B holiday diagnostic; catalog-supported candidate; testing</description>
+    <device ID="209F">
+      <addr>2535</addr>
+      <len>1</len>
+    </device>
+  </command>
+</commands>
