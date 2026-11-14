@@ -1,0 +1,251 @@
+{
+  "source_path": "/Users/rdp/Downloads/Viessmann/DPDefinitions.xml",
+  "source_sha256": "efec27568d398021c767771af016143bd51fc196d2d408dbb80faff84d0b19e3",
+  "definition_version": "0.0.26.4683",
+  "model": "V200KO2B",
+  "model_id": 340,
+  "linked_event_definitions": 619,
+  "cross_checked_shared_layouts": 36,
+  "byte_positions": "zero-based",
+  "bit_numbering_candidate": "MSB-first within bytes in wire order, consistent with OptoV decoder; verify on this installation",
+  "fields": [
+    {
+      "id": "244",
+      "field": "DigitalAusgang_Brenner~0x0842",
+      "conversion": "NoConversion",
+      "layout": {
+        "Address": "0x0842",
+        "FCRead": "Virtual_READ",
+        "FCWrite": "undefined",
+        "BlockLength": 1,
+        "BytePosition": 0,
+        "ByteLength": 1,
+        "BitPosition": 0,
+        "BitLength": 0
+      },
+      "enum_values": [
+        "0",
+        "1"
+      ]
+    },
+    {
+      "id": "4125",
+      "field": "nvoAlarm_Fehlercode~0xA132",
+      "conversion": "NoConversion",
+      "layout": {
+        "Address": "0xA132",
+        "FCRead": "Virtual_READ",
+        "FCWrite": "undefined",
+        "BlockLength": 29,
+        "BytePosition": 28,
+        "ByteLength": 1,
+        "BitPosition": 0,
+        "BitLength": 0
+      },
+      "enum_values": []
+    },
+    {
+      "id": "4126",
+      "field": "nvoAlarm_Fehlermanager~0xA132",
+      "conversion": "NoConversion",
+      "layout": {
+        "Address": "0xA132",
+        "FCRead": "Virtual_READ",
+        "FCWrite": "undefined",
+        "BlockLength": 29,
+        "BytePosition": 14,
+        "ByteLength": 1,
+        "BitPosition": 114,
+        "BitLength": 1
+      },
+      "enum_values": [
+        "0",
+        "1"
+      ]
+    },
+    {
+      "id": "4137",
+      "field": "nvoAlarm_Veraenderung~0xA132",
+      "conversion": "NoConversion",
+      "layout": {
+        "Address": "0xA132",
+        "FCRead": "Virtual_READ",
+        "FCWrite": "undefined",
+        "BlockLength": 29,
+        "BytePosition": 14,
+        "ByteLength": 1,
+        "BitPosition": 115,
+        "BitLength": 1
+      },
+      "enum_values": [
+        "0",
+        "1"
+      ]
+    },
+    {
+      "id": "4165",
+      "field": "nvoBoilerState_BLR_value~0xA305",
+      "conversion": "Div2",
+      "layout": {
+        "Address": "0xA305",
+        "FCRead": "Virtual_READ",
+        "FCWrite": "undefined",
+        "BlockLength": 2,
+        "BytePosition": 0,
+        "ByteLength": 1,
+        "BitPosition": 0,
+        "BitLength": 0
+      },
+      "enum_values": []
+    },
+    {
+      "id": "4182",
+      "field": "nvoProdCState_Fehler_CFDM~0xA395",
+      "conversion": "NoConversion",
+      "layout": {
+        "Address": "0xA395",
+        "FCRead": "Virtual_READ",
+        "FCWrite": "undefined",
+        "BlockLength": 4,
+        "BytePosition": 2,
+        "ByteLength": 1,
+        "BitPosition": 21,
+        "BitLength": 1
+      },
+      "enum_values": [
+        "0",
+        "1"
+      ]
+    },
+    {
+      "id": "4183",
+      "field": "nvoProdCState_HarteSperre_CFDM~0xA395",
+      "conversion": "NoConversion",
+      "layout": {
+        "Address": "0xA395",
+        "FCRead": "Virtual_READ",
+        "FCWrite": "undefined",
+        "BlockLength": 4,
+        "BytePosition": 2,
+        "ByteLength": 1,
+        "BitPosition": 23,
+        "BitLength": 1
+      },
+      "enum_values": [
+        "0",
+        "1"
+      ]
+    },
+    {
+      "id": "4187",
+      "field": "nvoProdCState_SP_CFDM~0xA395",
+      "conversion": "NoConversion",
+      "layout": {
+        "Address": "0xA395",
+        "FCRead": "Virtual_READ",
+        "FCWrite": "undefined",
+        "BlockLength": 4,
+        "BytePosition": 2,
+        "ByteLength": 1,
+        "BitPosition": 20,
+        "BitLength": 1
+      },
+      "enum_values": [
+        "0",
+        "1"
+      ]
+    },
+    {
+      "id": "4188",
+      "field": "nvoProdCState_Speicher_CFDM~0xA395",
+      "conversion": "NoConversion",
+      "layout": {
+        "Address": "0xA395",
+        "FCRead": "Virtual_READ",
+        "FCWrite": "undefined",
+        "BlockLength": 4,
+        "BytePosition": 1,
+        "ByteLength": 1,
+        "BitPosition": 14,
+        "BitLength": 1
+      },
+      "enum_values": [
+        "0",
+        "1"
+      ]
+    },
+    {
+      "id": "4194",
+      "field": "nvoPWRState_CFDM_state~0xA38F",
+      "conversion": "NoConversion",
+      "layout": {
+        "Address": "0xA38F",
+        "FCRead": "Virtual_READ",
+        "FCWrite": "undefined",
+        "BlockLength": 2,
+        "BytePosition": 1,
+        "ByteLength": 1,
+        "BitPosition": 0,
+        "BitLength": 0
+      },
+      "enum_values": [
+        "0",
+        "1"
+      ]
+    },
+    {
+      "id": "4195",
+      "field": "nvoPWRState_CFDM_value~0xA38F",
+      "conversion": "Div2",
+      "layout": {
+        "Address": "0xA38F",
+        "FCRead": "Virtual_READ",
+        "FCWrite": "undefined",
+        "BlockLength": 2,
+        "BytePosition": 0,
+        "ByteLength": 1,
+        "BitPosition": 0,
+        "BitLength": 0
+      },
+      "enum_values": []
+    },
+    {
+      "id": "4199",
+      "field": "nvoRelayState_Brenner~0xA152",
+      "conversion": "NoConversion",
+      "layout": {
+        "Address": "0xA152",
+        "FCRead": "Virtual_READ",
+        "FCWrite": "undefined",
+        "BlockLength": 2,
+        "BytePosition": 0,
+        "ByteLength": 2,
+        "BitPosition": 6,
+        "BitLength": 1
+      },
+      "enum_values": [
+        "0",
+        "1"
+      ]
+    },
+    {
+      "id": "4215",
+      "field": "nvoRelayState_Sammelstoerung~0xA152",
+      "conversion": "NoConversion",
+      "layout": {
+        "Address": "0xA152",
+        "FCRead": "Virtual_READ",
+        "FCWrite": "undefined",
+        "BlockLength": 2,
+        "BytePosition": 0,
+        "ByteLength": 2,
+        "BitPosition": 7,
+        "BitLength": 1
+      },
+      "enum_values": [
+        "0",
+        "1"
+      ]
+    }
+  ]
+}
