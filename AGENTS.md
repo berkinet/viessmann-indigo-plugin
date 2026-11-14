@@ -76,3 +76,5 @@ The owner authorized live holiday get/set discovery, supplied future departure/r
 The owner requested explicit Unset, Set (not active), and Active states and periodic rereads to capture changes through the controller/app; invalid or conflicting reads must remain Unknown with validity false. Keep the distinction between exact-catalog active-bit metadata and an observed active holiday: only unset and future/inactive schedules have been live-tested. See docs/holiday-command-tests-2026-11-14.md.
 
 Display time must be local to the heater location, not the viewer. The system heaterTimeZone property defaults to Europe/Paris; lastHealthCheckLocal uses that zone with daylight-saving rules. Preserve the existing UTC timestamps for logs and comparisons. Owner installs releases from GitHub; do not install locally on their behalf.
+
+Owner authorized a dedicated holiday-clear action on 14 November: write both 1970-01-01 sentinel dates with existing identity/opt-in/health/ACK/readback safeguards. This supersedes cancellation being unimplemented. Live clearing still requires owner testing; do not report success from dispatch alone.

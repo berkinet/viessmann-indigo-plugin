@@ -114,6 +114,13 @@ class Plugin(indigo.PluginBase):
         except (ValueError, TypeError) as exc:
             self.logger.error('Holiday action rejected: %s', exc)
 
+    def clearHoliday(self, action, dev):
+        if dev.deviceTypeId != 'viessmannSystem' or dev.id != self.system_id:
+            self.logger.error('Select the active Viessmann system')
+            return
+        dev.updateStatesOnServer([{'key': 'holidayActionStatus', 'value': 'Pending holiday clear confirmation'}])
+        self.events.put(('clearHoliday', (dev.id, '1970-01-01', '1970-01-01', self.manager.settings)))
+
     @staticmethod
     def _holiday_updates(result):
         if result.holiday_attempted:
@@ -525,7 +532,7 @@ class Plugin(indigo.PluginBase):
                         and (device_id == self.system_id or str(dev.pluginProps.get('systemId', '')) == str(self.system_id))):
                     self.manager.request_poll()
                 continue
-            if action == 'holiday':
+            if action in ('holiday', 'clearHoliday'):
                 ident, departure, returning, expected = device_id
                 self._configure()
                 dev = self._device(ident)
@@ -534,11 +541,11 @@ class Plugin(indigo.PluginBase):
                 try:
                     if ident != self.system_id or expected is None or self.manager.settings != expected:
                         raise ValueError('Configuration changed before holiday action; retry explicitly')
-                    actual = self.manager.write_holiday(departure, returning, self.closing.is_set)
+                    actual = self.manager.write_holiday(departure, returning, self.closing.is_set, clear=action == 'clearHoliday')
                     dev.updateStatesOnServer([{'key': k, 'value': v} for k, v in actual.items()] + [
                         {'key': 'holidayValid', 'value': True}, {'key': 'holidayError', 'value': ''},
                         {'key': 'holidayUpdated', 'value': datetime.now(timezone.utc).isoformat(timespec='seconds')},
-                        {'key': 'holidayActionStatus', 'value': 'Holiday dates readback confirmed'}])
+                        {'key': 'holidayActionStatus', 'value': 'Holiday cleared; readback confirmed' if action == 'clearHoliday' else 'Holiday dates readback confirmed'}])
                 except (OSError, ValueError, TypeError, KeyError) as exc:
                     dev.updateStatesOnServer([{'key': 'holidayValid', 'value': False},
                         {'key': 'holidayStatus', 'value': 'Unknown'},

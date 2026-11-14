@@ -47,3 +47,7 @@ Use the system device's **Set holiday departure and return dates** plugin action
 The new system property **Heater location time zone** defaults to `Europe/Paris`. `lastHealthCheckLocal` formats the successful response time in that zone (CET/CEST as appropriate), independent of the viewer. Existing UTC states remain unchanged. The control page can use **Last controller response (heater local time)** after this version is installed.
 
 See [verified holiday commands and tests](docs/holiday-command-tests-2026-11-14.md). No additional physical holiday writes were performed while implementing the plugin; the previously verified 20 November / 13 December 2026 test schedule remains on the controller.
+
+## Version 0.2.21
+
+Dedicated Clear holiday dates action writes both 1970-01-01 reset dates and confirms Unset by readback. Normal date-setting still rejects past dates. Live clear effectiveness awaits owner testing.

@@ -395,12 +395,14 @@ class Client:
                              self._exchange('getHolidayEnd', cancelled),
                              self._exchange('getProbeHolidayActiveRaw', cancelled))
 
-    def write_holiday(self, departure, returning, cancelled=lambda: False):
+    def write_holiday(self, departure, returning, cancelled=lambda: False, *, clear=False):
         # Two independent date registers: no atomicity, rollback or blind retries.
         start, end = date.fromisoformat(departure), date.fromisoformat(returning)
         departure, returning = start.isoformat(), end.isoformat()
         today = datetime.now(ZoneInfo(self.settings.heater_timezone)).date()
-        if not today <= start < end <= date(2099, 12, 31) or end <= start + timedelta(days=1):
+        if clear and (start != UNSET_HOLIDAY or end != UNSET_HOLIDAY):
+            raise ValueError('Clear holiday requires both reset dates')
+        if not clear and (not today <= start < end <= date(2099, 12, 31) or end <= start + timedelta(days=1)):
             raise ValueError('Use departure today or later, and return at least two days later (through 2099)')
         try:
             self._connect(cancelled)
@@ -411,7 +413,7 @@ class Client:
             if self._ensure_health(health, cancelled) != identity:
                 raise PermissionError('Controller identity changed')
             current = self.read_holiday(cancelled)
-            if current['holidayActive']:
+            if current['holidayActive'] and not clear:
                 raise PermissionError('Replacing an active holiday is not supported')
             # Our tested TI setter path requires the vcontrold daemon to use UTC.
             for getter in ('getHolidayStart', 'getHolidayEnd'):
@@ -429,7 +431,8 @@ class Client:
                 if holiday_date(self._exchange(getter, cancelled)) != value:
                     raise ValueError('Holiday readback mismatch; schedule uncertain, not retried')
             actual = self.read_holiday(cancelled)
-            if actual['holidayDeparture'] != departure or actual['holidayReturn'] != returning:
+            if (clear and not actual['holidayUnset']) or (not clear and
+                    (actual['holidayDeparture'] != departure or actual['holidayReturn'] != returning)):
                 raise ValueError('Holiday pair mismatch; schedule uncertain, not retried')
             return actual
         except (OSError, ValueError, UnicodeError):
@@ -548,12 +551,12 @@ class Manager:
         actual = self.client.write_setpoint(target, value, cancelled)
         return actual
 
-    def write_holiday(self, departure, returning, cancelled=lambda: False):
+    def write_holiday(self, departure, returning, cancelled=lambda: False, *, clear=False):
         if self.settings is None or not self.settings.enabled:
             raise PermissionError('Polling must be enabled to set holidays')
         if self.client is None:
             self.client = self.client_factory(self.settings)
-        return self.client.write_holiday(departure, returning, cancelled)
+        return self.client.write_holiday(departure, returning, cancelled, clear=clear)
 
     def close(self):
         self.requested = False

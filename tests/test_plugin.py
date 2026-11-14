@@ -1134,6 +1134,25 @@ class HolidayTests(unittest.TestCase):
 
 
 class HolidayReadbackTests(unittest.TestCase):
+    def test_clear_is_explicit_and_requires_effective_readback(self):
+        server = FixtureServer()
+        try:
+            client = Client(server.settings(live_writes=True))
+            with self.assertRaises(ValueError):
+                client.write_holiday('1970-01-01', '1970-01-01')
+            server.holidays.update(getHolidayStart='2090-11-20T00:00:00+0000',
+                                   getHolidayEnd='2090-12-13T00:00:00+0000')
+            server.apply_setter = False
+            with self.assertRaisesRegex(ValueError, 'readback mismatch'):
+                client.write_holiday('1970-01-01', '1970-01-01', clear=True)
+            self.assertEqual(sum(c.startswith('setHoliday') for c in server.commands), 1)
+            server.apply_setter = True
+            actual = client.write_holiday('1970-01-01', '1970-01-01', clear=True)
+            self.assertTrue(actual['holidayUnset'])
+            self.assertEqual(actual['holidayStatus'], 'Unset')
+            client.disconnect()
+        finally: server.stop()
+
     def test_ack_without_effect_stops_before_second_write(self):
         server = FixtureServer()
         try:
