@@ -30,3 +30,9 @@ Primary sources:
 ## Conclusion
 
 An explicit flame signal exists in other Viessmann systems, so the broader search is productive. getStatusFlamme/getVitoStatusFlamme are candidates for a controlled raw read/transition comparison, not established KO2B capability. The Siemens LED has a real diagnostic data path, but continuous operation and compatibility are unresolved. Continue prioritizing exact KO2B structure evidence and preserve unknowns; do not infer flame from burner output alone.
+
+## Nameplate confirmed by owner photograph
+
+The owner's 14 November photograph identifies the installed burner control as Siemens **LMO64.301C2V**, Siemens order code **S55333-B402-A100**, Viessmann **VI9668559**. Label supply: 230 V AC, 50–60 Hz; TSA max 10 s, t8=90 s. Photo source: /Users/rdp/Desktop/Screenshots/Siemens-burnet-controller.jpg. A still photograph shows green illumination but cannot establish steady versus flashing. Earlier LMO14 identification was an assumption from a family manual and is superseded.
+
+Siemens LMO64 datasheet CC1N7138en explicitly supports OCI400/ACS410 and describes unidirectional UDS transmission of operational status, faults and service information in diagnostic mode. Compatibility at family level is now supported; continuous normal-operation capture and exact Viessmann variant behavior remain unverified. Primary document: https://sid.siemens.com/api/khub/documents/TYtoZZmW~TAs9jeFy7WJAg/content .
