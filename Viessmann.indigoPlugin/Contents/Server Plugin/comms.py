@@ -1,6 +1,7 @@
 """Single-owner vcontrold polling and explicitly authorized setpoints; independent of Indigo."""
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 import math
 import re
 import socket
@@ -29,6 +30,37 @@ def temperature(text):
     return value
 
 
+HOLIDAY_READS = {'getHolidayStart', 'getHolidayEnd', 'getProbeHolidayActiveRaw'}
+UNSET_HOLIDAY = date(1970, 1, 1)
+
+
+def holiday_date(text):
+    # These are controller-local calendar fields, not UTC instants. vcontrold's
+    # TI decoder incorrectly attaches its own daemon offset to those fields.
+    if not re.fullmatch(r'\d{4}-\d{2}-\d{2}T00:00:00[+-]\d{4}', text):
+        raise ValueError('Invalid holiday date reply: ' + text[:120])
+    return date.fromisoformat(text[:10])
+
+
+def holiday_state(start, end, raw):
+    departure, returning = holiday_date(start), holiday_date(end)
+    if not re.fullmatch(r'[0-9A-Fa-f]{2}', raw) or raw.upper() in ('05', 'FF'):
+        raise ValueError('Invalid holiday status byte')
+    active = bool(int(raw, 16) & 1)  # exact KO2B catalog: MSB-first bit 7
+    unset = departure == returning == UNSET_HOLIDAY
+    if (departure == UNSET_HOLIDAY) != (returning == UNSET_HOLIDAY):
+        raise ValueError('Incomplete holiday date pair')
+    if not unset and returning <= departure + timedelta(days=1):
+        raise ValueError('Holiday must contain at least one day between travel dates')
+    if unset and active:
+        raise ValueError('Holiday flag active with unset dates')
+    return {'holidayDeparture': '' if unset else departure.isoformat(),
+            'holidayReturn': '' if unset else returning.isoformat(),
+            'holidaySet': not unset, 'holidayUnset': unset, 'holidayActive': active,
+            'holidayStatus': 'Unset' if unset else ('Active' if active else 'Set (not active)'),
+            'holidayStatusRaw': raw.upper()}
+
+
 @dataclass(frozen=True)
 class Settings:
     host: str
@@ -41,8 +73,13 @@ class Settings:
     live_writes: bool = False
     health_interval: int = 30
     fault_interval: int = 60
+    heater_timezone: str = "Europe/Paris"
 
     def __post_init__(self):
+        try:
+            ZoneInfo(self.heater_timezone)
+        except (KeyError, ValueError) as exc:
+            raise ValueError("Unknown heater time zone") from exc
         if self.target not in ('standard', 'reduced', 'party'):
             raise ValueError('Invalid room target')
         if not self.host or any(c.isspace() for c in self.host):
@@ -89,6 +126,10 @@ class Result:
     burner_output_raw: str = ''
     burner_output_checked: str = ''
     burner_output_error: str = ''
+    holiday: dict | None = None
+    holiday_error: str = ''
+    holiday_checked: str = ''
+    holiday_attempted: bool = False
 
 
 class Client:
@@ -133,7 +174,7 @@ class Client:
         return frame.decode('ascii').strip()
 
     def _exchange(self, command, cancelled):
-        allowed = set(READS.values()) | {v[0] for v in TARGETS.values()} | {'getProbeRoomTemp', 'getSystemTime', 'getError0', 'getProbeRelayStatus', 'getProbeProductionStatus', 'getProbeBurner1', 'getProbeOutputStatus', 'device', 'close'}
+        allowed = HOLIDAY_READS | set(READS.values()) | {v[0] for v in TARGETS.values()} | {'getProbeRoomTemp', 'getSystemTime', 'getError0', 'getProbeRelayStatus', 'getProbeProductionStatus', 'getProbeBurner1', 'getProbeOutputStatus', 'device', 'close'}
         if command not in allowed:
             raise ValueError('Command is not an allowed read or link release')
         self.sock.settimeout(self.settings.timeout)
@@ -340,7 +381,60 @@ class Client:
                     if missing not in result.values and missing not in result.errors:
                         result.errors[missing] = str(exc)
                 break
+        if (result.live_identity or result.simulator) and self.sock is not None:
+            result.holiday_attempted = True
+            try:
+                result.holiday = self.read_holiday(cancelled)
+                result.holiday_checked = datetime.now(timezone.utc).isoformat(timespec='seconds')
+            except (OSError, ValueError, UnicodeError) as exc:
+                result.holiday_error = str(exc)
         return result
+
+    def read_holiday(self, cancelled=lambda: False):
+        return holiday_state(self._exchange('getHolidayStart', cancelled),
+                             self._exchange('getHolidayEnd', cancelled),
+                             self._exchange('getProbeHolidayActiveRaw', cancelled))
+
+    def write_holiday(self, departure, returning, cancelled=lambda: False):
+        # Two independent date registers: no atomicity, rollback or blind retries.
+        start, end = date.fromisoformat(departure), date.fromisoformat(returning)
+        departure, returning = start.isoformat(), end.isoformat()
+        today = datetime.now(ZoneInfo(self.settings.heater_timezone)).date()
+        if not today <= start < end <= date(2099, 12, 31) or end <= start + timedelta(days=1):
+            raise ValueError('Use departure today or later, and return at least two days later (through 2099)')
+        try:
+            self._connect(cancelled)
+            identity = self._exchange('device', cancelled)
+            if identity != LIVE_ID or not self.settings.live_writes:
+                raise PermissionError('Holiday writes require live opt-in and verified KO2B identity')
+            health = Result()
+            if self._ensure_health(health, cancelled) != identity:
+                raise PermissionError('Controller identity changed')
+            current = self.read_holiday(cancelled)
+            if current['holidayActive']:
+                raise PermissionError('Replacing an active holiday is not supported')
+            # Our tested TI setter path requires the vcontrold daemon to use UTC.
+            for getter in ('getHolidayStart', 'getHolidayEnd'):
+                if not self._exchange(getter, cancelled).endswith('+0000'):
+                    raise PermissionError('Holiday writes currently require a UTC vcontrold daemon')
+            for setter, getter, value in [('setHolidayStart', 'getHolidayStart', start),
+                                           ('setHolidayEnd', 'getHolidayEnd', end)]:
+                if cancelled():
+                    raise InterruptedError('Cancelled before holiday write; schedule may be incomplete')
+                payload = value.isoformat() + 'T00:00:00+0000'
+                self.sock.settimeout(self.settings.timeout)
+                self.sock.sendall((setter + ' ' + payload + '\n').encode('ascii'))
+                if self._frame(cancelled) != 'OK':
+                    raise ValueError('Holiday setter not acknowledged; schedule uncertain, not retried')
+                if holiday_date(self._exchange(getter, cancelled)) != value:
+                    raise ValueError('Holiday readback mismatch; schedule uncertain, not retried')
+            actual = self.read_holiday(cancelled)
+            if actual['holidayDeparture'] != departure or actual['holidayReturn'] != returning:
+                raise ValueError('Holiday pair mismatch; schedule uncertain, not retried')
+            return actual
+        except (OSError, ValueError, UnicodeError):
+            self.disconnect()
+            raise
 
     def write_setpoint(self, target, value, cancelled=lambda: False):
         """Fresh endpoint identity, explicit live opt-in, one setter and readback; no retries."""
@@ -453,6 +547,13 @@ class Manager:
             self.client = self.client_factory(self.settings)
         actual = self.client.write_setpoint(target, value, cancelled)
         return actual
+
+    def write_holiday(self, departure, returning, cancelled=lambda: False):
+        if self.settings is None or not self.settings.enabled:
+            raise PermissionError('Polling must be enabled to set holidays')
+        if self.client is None:
+            self.client = self.client_factory(self.settings)
+        return self.client.write_holiday(departure, returning, cancelled)
 
     def close(self):
         self.requested = False

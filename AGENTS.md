@@ -67,3 +67,12 @@ The owner explicitly authorized coding the A152 first-byte mask 01 interpretatio
 ## Publication approved — 13 November 2026
 
 After reviewing the local changes and measured-room display mapping, the owner explicitly approved push/publication of 0.2.15 and returning to the normal workflow. This lifts the earlier publication hold. Standing commit/push/publication authorization resumes; do not ask repeatedly. Indigo installation remains owner-managed through GitHub downloads. The temporary restart monitor was stopped and its capture archived to avoid competing with the new persistent optical owner.
+
+
+## Holiday support authorized — 14 November 2026
+
+The owner authorized live holiday get/set discovery, supplied future departure/return test dates (final 20 November / 13 December 2026), and requested plugin support and publication. This extends the prior permitted live-write targets to future holiday departure/return dates only, through the existing live-write opt-in. Exact KO2B identity, fresh reads, per-register acknowledgement and readback remain required. Do not retry uncertain writes or imply an atomic pair update. The tested normal TI setter path requires the vcontrold daemon to run UTC; heater dates remain local calendar dates. Active-holiday replacement and cancellation are not implemented.
+
+The owner requested explicit Unset, Set (not active), and Active states and periodic rereads to capture changes through the controller/app; invalid or conflicting reads must remain Unknown with validity false. Keep the distinction between exact-catalog active-bit metadata and an observed active holiday: only unset and future/inactive schedules have been live-tested. See docs/holiday-command-tests-2026-11-14.md.
+
+Display time must be local to the heater location, not the viewer. The system heaterTimeZone property defaults to Europe/Paris; lastHealthCheckLocal uses that zone with daylight-saving rules. Preserve the existing UTC timestamps for logs and comparisons. Owner installs releases from GitHub; do not install locally on their behalf.

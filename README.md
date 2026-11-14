@@ -37,3 +37,13 @@ The system heating icon now follows valid nonzero `burnerOutput`, with healthy c
 When valid readings show nonzero output while `burnerActive` is false, the plugin logs an error once per conflicting episode. A valid consistent pair allows a future episode to be logged; invalid readings do not clear the episode. Reads are sequential, so a single occurrence can reflect a transition between requests.
 
 The state selectors now say **Burner active** and **Burner active reading valid**, retaining their existing state IDs. See [burner enable versus firing research](docs/burner-enable-versus-firing-2026-11-14.md) for interpretation limits.
+
+## Version 0.2.20 — holidays and heater-local time
+
+The system device rereads holiday departure/return dates and the active flag on every full poll (the configured polling interval, normally 180 seconds), and on a status request. `holidayStatus` reports **Unset**, **Set (not active)**, **Active**, or **Unknown**. `holidaySet`, `holidayUnset`, `holidayActive` and `holidayValid` support triggers; check validity before using retained values. External changes through the controller or app are picked up on the next poll.
+
+Use the system device's **Set holiday departure and return dates** plugin action with YYYY-MM-DD travel dates. Requires polling, existing live-write opt-in, verified KO2B identity, the tested holiday commands in vcontrold, and a UTC vcontrold daemon. Departure must be today or later, return at least two days later, through 2099. Holiday operation starts the day after departure and ends at midnight on return. Active-program replacement and cancellation are not included. Writes are sequential, individually acknowledged/read back, and never automatically retried or rolled back; inspect the dates after a failure because a partial schedule may remain.
+
+The new system property **Heater location time zone** defaults to `Europe/Paris`. `lastHealthCheckLocal` formats the successful response time in that zone (CET/CEST as appropriate), independent of the viewer. Existing UTC states remain unchanged. The control page can use **Last controller response (heater local time)** after this version is installed.
+
+See [verified holiday commands and tests](docs/holiday-command-tests-2026-11-14.md). No additional physical holiday writes were performed while implementing the plugin; the previously verified 20 November / 13 December 2026 test schedule remains on the controller.

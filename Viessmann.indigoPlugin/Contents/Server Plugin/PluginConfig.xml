@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PluginConfig>
   <Field id="liveWritesEnabled" type="checkbox" defaultValue="false">
-    <Label>Enable live room and hot-water setpoint writes</Label>
+    <Label>Enable live setpoint and holiday-date writes</Label>
   </Field>
   <Field id="configurationHelp" type="label">
-    <Label>Live writes support the standard room target (3–37 C) and DHW target (10–60 C), whole degrees only, on the verified KO2B/209F endpoint. Polling must be enabled and target readings valid. A recent successful controller-clock health check is required. Each write checks the target, acknowledgement and readback; uncertain writes are not retried. Reduced/party writes remain simulator-only. Connection and polling settings are on the system device.</Label>
+    <Label>Live writes support future holiday departure/return dates and the standard room target (3–37 C) and DHW target (10–60 C), whole degrees only, on the verified KO2B/209F endpoint. Polling must be enabled and target readings valid. A recent successful controller-clock health check is required. Each write checks the target, acknowledgement and readback; uncertain writes are not retried. Reduced/party writes remain simulator-only. Connection and polling settings are on the system device.</Label>
   </Field>
 </PluginConfig>

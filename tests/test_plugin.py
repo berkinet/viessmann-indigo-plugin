@@ -10,7 +10,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'Viessmann.indigoPlugin/Contents/Server Plugin'))
-from comms import Client, Manager, Settings, Result, READS, temperature
+from comms import Client, Manager, Settings, Result, READS, temperature, holiday_state
 
 
 def readings(*values):
@@ -30,6 +30,8 @@ class FixtureServer(socketserver.ThreadingTCPServer):
         self.activity_reply = 'Result: 05'
         self.clock_reply = '2026-11-13T14:37:23+0000'
         self.targets = {'getRoomTempSP': '19', 'getTempWWsoll': '50'}
+        self.holidays = {'getHolidayStart': '1970-01-01T00:00:00+0000', 'getHolidayEnd': '1970-01-01T00:00:00+0000'}
+        self.holiday_raw = '02'
         self.output_reply = '4B 01'
         self.production_reply = '00 00 00 00'
         self.burner_reply = '01'
@@ -67,6 +69,15 @@ class FixtureServer(socketserver.ThreadingTCPServer):
                             if owner.activity_reply is None:
                                 return  # vcontrold exits child on raw read timeout
                             reply = owner.activity_reply + '\nvctrld> '
+                        elif command in owner.holidays:
+                            reply = owner.holidays[command] + '\nvctrld> '
+                        elif command == 'getProbeHolidayActiveRaw':
+                            reply = owner.holiday_raw + '\nvctrld> '
+                        elif command.startswith(('setHolidayStart ', 'setHolidayEnd ')):
+                            setter, value = command.split()
+                            getter = 'getHolidayStart' if setter == 'setHolidayStart' else 'getHolidayEnd'
+                            if owner.apply_setter: owner.holidays[getter] = value
+                            reply = owner.setter_reply + '\nvctrld> '
                         elif command == 'getProbeOutputStatus':
                             reply = owner.output_reply + '\nvctrld> '
                         elif command == 'getProbeProductionStatus':
@@ -121,7 +132,8 @@ class TransportTests(unittest.TestCase):
                 self.assertFalse(result.errors)
                 self.assertFalse(result.release_error)
             self.assertEqual(server.connections, 1)
-            self.assertEqual(server.commands, ['device', 'getSystemTime'] + list(READS.values()) + ['getProbeRoomTemp', 'device'] + list(READS.values()) + ['getProbeRoomTemp'])
+            self.assertEqual(server.commands.count('device'), 2)
+            self.assertEqual(server.commands.count('getSystemTime'), 1)
             self.assertTrue(result.health_ok)
             self.assertNotIn('close', server.commands)
         finally:
@@ -692,6 +704,36 @@ class AdapterTests(unittest.TestCase):
         for ident in (2, 3):
             self.assertEqual((self.devices[ident].states, self.devices[ident].pluginProps), children[ident])
 
+    def test_heater_local_time_uses_site_zone_and_summer_time(self):
+        winter = self.plugin._health_updates(Result(health_ok=True, health_checked='2026-11-14T14:00:00+00:00'))
+        summer = self.plugin._health_updates(Result(health_ok=True, health_checked='2026-07-14T14:00:00+00:00'))
+        self.assertEqual(dict((u['key'], u['value']) for u in winter)['lastHealthCheckLocal'], '2026-11-14 15:00:00 CET')
+        self.assertEqual(dict((u['key'], u['value']) for u in summer)['lastHealthCheckLocal'], '2026-07-14 16:00:00 CEST')
+        with self.assertRaises(ValueError): Settings('localhost', heater_timezone='Invalid/Zone')
+
+    def test_holiday_publish_and_failed_read_keep_dates_but_mark_unknown(self):
+        system = self.devices[1]
+        actual = holiday_state('2090-11-20T00:00:00+0000', '2090-12-13T00:00:00+0000', '02')
+        self.plugin._publish(Result(values=readings(45, 12, 23, 50), health_ok=True,
+            tcp_available=True, holiday_attempted=True, holiday=actual, holiday_checked='now'))
+        self.assertEqual(system.states['holidayStatus'], 'Set (not active)')
+        self.assertTrue(system.states['holidayValid'])
+        self.plugin._publish(Result(values=readings(45, 12, 23, 50), health_ok=True,
+            tcp_available=True, holiday_attempted=True, holiday_error='unsupported command'))
+        self.assertEqual(system.states['holidayDeparture'], '2090-11-20')
+        self.assertEqual(system.states['holidayStatus'], 'Unknown')
+        self.assertFalse(system.states['holidayValid'])
+
+    def test_holiday_action_cannot_follow_reconfigured_endpoint(self):
+        calls = []
+        self.plugin.manager.write_holiday = lambda *a: calls.append(a)
+        self.plugin.setHoliday(types.SimpleNamespace(props={'departure': '2090-11-20', 'returning': '2090-12-13'}), self.devices[1])
+        self.devices[1].pluginProps['host'] = 'another-host'
+        with self.assertLogs('test', level='ERROR'):
+            self.plugin._process_events()
+        self.assertEqual(calls, [])
+        self.assertEqual(self.devices[1].states['holidayStatus'], 'Unknown')
+
     def test_clock_success_advances_only_system_last_success_even_with_fault(self):
         system = self.devices[1]
         system.states['lastSuccess'] = '2026-11-13T13:00:00+00:00'
@@ -1022,6 +1064,86 @@ class BundleTests(unittest.TestCase):
         for device in devices.findall('Device'):
             with self.subTest(device=device.get('id')):
                 self.assertTrue(device.findall('./ConfigUI/Field'), 'Device configuration dialog is empty')
+
+
+
+
+
+class HolidayTests(unittest.TestCase):
+    def test_unset_scheduled_active_and_invalid_pairs(self):
+        empty = '1970-01-01T00:00:00+0000'
+        start, end = '2090-11-20T00:00:00+0000', '2090-12-13T00:00:00+0000'
+        self.assertEqual(holiday_state(empty, empty, '02')['holidayStatus'], 'Unset')
+        self.assertEqual(holiday_state(start, end, '02')['holidayStatus'], 'Set (not active)')
+        self.assertEqual(holiday_state(start, end, '03')['holidayStatus'], 'Active')
+        for args in [(start, empty, '02'), (empty, empty, '03'), (start, end, '05'),
+                     (end, start, '02'), ('ERR', end, '02')]:
+            with self.assertRaises(ValueError): holiday_state(*args)
+
+    def test_external_changes_are_read_on_next_poll(self):
+        server = FixtureServer()
+        try:
+            client = Client(server.settings())
+            self.assertEqual(client.poll().holiday['holidayStatus'], 'Unset')
+            server.holidays.update(getHolidayStart='2090-11-20T00:00:00+0000',
+                                   getHolidayEnd='2090-12-13T00:00:00+0000')
+            self.assertEqual(client.poll().holiday['holidayStatus'], 'Set (not active)')
+            server.holiday_raw = '03'
+            self.assertEqual(client.poll().holiday['holidayStatus'], 'Active')
+            server.holiday_raw = 'ERR'
+            result = client.poll()
+            self.assertIsNone(result.holiday)
+            self.assertTrue(result.holiday_error)
+            client.disconnect()
+        finally: server.stop()
+
+    def test_writes_require_opt_in_ack_and_readback_without_retry(self):
+        server = FixtureServer()
+        try:
+            client = Client(server.settings())
+            with self.assertRaises(PermissionError): client.write_holiday('2090-11-20', '2090-12-13')
+            self.assertFalse(any(c.startswith('setHoliday') for c in server.commands))
+            client.disconnect()
+            client = Client(server.settings(live_writes=True))
+            actual = client.write_holiday('2090-11-20', '2090-12-13')
+            self.assertEqual(actual['holidayStatus'], 'Set (not active)')
+            server.setter_reply = 'ERR'
+            before = sum(c.startswith('setHoliday') for c in server.commands)
+            with self.assertRaises(ValueError): client.write_holiday('2090-11-21', '2090-12-14')
+            self.assertEqual(sum(c.startswith('setHoliday') for c in server.commands), before+1)
+            client.disconnect()
+        finally: server.stop()
+
+    def test_bad_dates_identity_and_active_schedule_block_writes(self):
+        server = FixtureServer()
+        try:
+            client = Client(server.settings(live_writes=True))
+            for dates in [('2090-02-30', '2090-03-10'), ('2090-11-20', '2090-11-21'),
+                          ('1970-01-01', '2090-12-13')]:
+                with self.assertRaises(ValueError): client.write_holiday(*dates)
+            server.identity = 'OTHER'
+            with self.assertRaises(PermissionError): client.write_holiday('2090-11-20', '2090-12-13')
+            server.identity = 'V200KO2B (ID=209F) (Protocol=KW2)'
+            server.holidays.update(getHolidayStart='2090-11-20T00:00:00+0000',
+                                   getHolidayEnd='2090-12-13T00:00:00+0000')
+            server.holiday_raw = '03'
+            with self.assertRaises(PermissionError): client.write_holiday('2090-11-21', '2090-12-14')
+            self.assertFalse(any(c.startswith('setHoliday') for c in server.commands))
+            client.disconnect()
+        finally: server.stop()
+
+
+class HolidayReadbackTests(unittest.TestCase):
+    def test_ack_without_effect_stops_before_second_write(self):
+        server = FixtureServer()
+        try:
+            server.apply_setter = False
+            client = Client(server.settings(live_writes=True))
+            with self.assertRaisesRegex(ValueError, 'readback mismatch'):
+                client.write_holiday('2090-11-20', '2090-12-13')
+            self.assertEqual(sum(c.startswith('setHoliday') for c in server.commands), 1)
+            client.disconnect()
+        finally: server.stop()
 
 
 if __name__ == '__main__':

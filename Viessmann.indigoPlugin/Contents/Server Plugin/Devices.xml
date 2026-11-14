@@ -34,9 +34,25 @@
         <Label>Optical activity:</Label>
         <Description>On a failed clock check, listen for 0x05 as a fallback diagnostic (KW/KW2 only). Successful clock checks keep the optical link open.</Description>
       </Field>
+      <Field id="heaterTimeZone" type="textfield" defaultValue="Europe/Paris">
+        <Label>Heater location time zone:</Label>
+        <Description>IANA zone, for example Europe/Paris. Displayed local times and holiday date validation use this location, never the viewer's zone.</Description>
+      </Field>
       <Field id="SupportsStatusRequest" type="checkbox" defaultValue="true" hidden="true" />
     </ConfigUI>
     <States>
+      <State id="holidayStatus"><ValueType>String</ValueType><TriggerLabel>Holiday status (Unset / Set, not active / Active / Unknown)</TriggerLabel><ControlPageLabel>Holiday status (Unset / Set, not active / Active / Unknown)</ControlPageLabel></State>
+      <State id="holidayUnset"><ValueType>Boolean</ValueType><TriggerLabel>Holiday unset</TriggerLabel><ControlPageLabel>Holiday unset</ControlPageLabel></State>
+      <State id="holidaySet"><ValueType>Boolean</ValueType><TriggerLabel>Holiday dates set</TriggerLabel><ControlPageLabel>Holiday dates set</ControlPageLabel></State>
+      <State id="holidayActive"><ValueType>Boolean</ValueType><TriggerLabel>Holiday active</TriggerLabel><ControlPageLabel>Holiday active</ControlPageLabel></State>
+      <State id="holidayValid"><ValueType>Boolean</ValueType><TriggerLabel>Holiday reading valid</TriggerLabel><ControlPageLabel>Holiday reading valid</ControlPageLabel></State>
+      <State id="holidayDeparture"><ValueType>String</ValueType><TriggerLabel>Holiday departure date (heater local)</TriggerLabel><ControlPageLabel>Holiday departure date (heater local)</ControlPageLabel></State>
+      <State id="holidayReturn"><ValueType>String</ValueType><TriggerLabel>Holiday return date (heater local)</TriggerLabel><ControlPageLabel>Holiday return date (heater local)</ControlPageLabel></State>
+      <State id="holidayUpdated"><ValueType>String</ValueType><TriggerLabel>Holiday last success (UTC)</TriggerLabel><ControlPageLabel>Holiday last success (UTC)</ControlPageLabel></State>
+      <State id="holidayError"><ValueType>String</ValueType><TriggerLabel>Holiday read error</TriggerLabel><ControlPageLabel>Holiday read error</ControlPageLabel></State>
+      <State id="holidayStatusRaw"><ValueType>String</ValueType><TriggerLabel>Raw holiday status byte</TriggerLabel><ControlPageLabel>Raw holiday status byte</ControlPageLabel></State>
+      <State id="holidayActionStatus"><ValueType>String</ValueType><TriggerLabel>Last holiday action</TriggerLabel><ControlPageLabel>Last holiday action</ControlPageLabel></State>
+      <State id="lastHealthCheckLocal"><ValueType>String</ValueType><TriggerLabel>Last controller response (heater local time)</TriggerLabel><ControlPageLabel>Last controller response (heater local time)</ControlPageLabel></State>
       <State id="productionFault"><ValueType>Boolean</ValueType><TriggerLabel>Production fault flag</TriggerLabel><ControlPageLabel>Production fault flag</ControlPageLabel></State>
       <State id="productionHardBlock"><ValueType>Boolean</ValueType><TriggerLabel>Production hard block — not verified burner lockout</TriggerLabel><ControlPageLabel>Production hard block — not verified burner lockout</ControlPageLabel></State>
       <State id="productionSpecialOperation"><ValueType>Boolean</ValueType><TriggerLabel>Production special operation</TriggerLabel><ControlPageLabel>Production special operation</ControlPageLabel></State>

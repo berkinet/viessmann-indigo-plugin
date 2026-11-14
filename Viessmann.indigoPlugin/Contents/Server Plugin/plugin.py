@@ -1,6 +1,7 @@
 import queue
 import threading
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
+from zoneinfo import ZoneInfo
 import indigo
 from comms import Manager, Settings, TARGETS
 
@@ -90,6 +91,43 @@ class Plugin(indigo.PluginBase):
         props['roomTarget'] = target
         dev.replacePluginPropsOnServer(props)
         self.events.put(('start', dev.id))
+
+    def validateActionConfigUi(self, valuesDict, typeId, actionId):
+        if typeId != 'setHoliday':
+            return True, valuesDict
+        errors = indigo.Dict()
+        for key in ('departure', 'returning'):
+            try:
+                valuesDict[key] = date.fromisoformat(str(valuesDict.get(key, '')).strip()).isoformat()
+            except ValueError:
+                errors[key] = 'Enter a date as YYYY-MM-DD'
+        return (False, valuesDict, errors) if errors else (True, valuesDict)
+
+    def setHoliday(self, action, dev):
+        try:
+            if dev.deviceTypeId != 'viessmannSystem' or dev.id != self.system_id:
+                raise ValueError('Select the active Viessmann system')
+            departure = date.fromisoformat(str(action.props.get('departure', '')).strip()).isoformat()
+            returning = date.fromisoformat(str(action.props.get('returning', '')).strip()).isoformat()
+            dev.updateStatesOnServer([{'key': 'holidayActionStatus', 'value': 'Pending holiday confirmation'}])
+            self.events.put(('holiday', (dev.id, departure, returning, self.manager.settings)))
+        except (ValueError, TypeError) as exc:
+            self.logger.error('Holiday action rejected: %s', exc)
+
+    @staticmethod
+    def _holiday_updates(result):
+        if result.holiday_attempted:
+            updates = [{'key': 'holidayValid', 'value': result.holiday is not None},
+                       {'key': 'holidayError', 'value': result.holiday_error}]
+            if result.holiday is not None:
+                updates.extend({'key': k, 'value': v} for k, v in result.holiday.items())
+                updates.append({'key': 'holidayUpdated', 'value': result.holiday_checked})
+            else:
+                updates.append({'key': 'holidayStatus', 'value': 'Unknown'})
+            return updates
+        if not result.health_ok:
+            return [{'key': 'holidayValid', 'value': False}, {'key': 'holidayStatus', 'value': 'Unknown'}]
+        return []
 
     def requestStatus(self, action, dev):
         self.events.put(('refresh', dev.id))
@@ -200,7 +238,8 @@ class Plugin(indigo.PluginBase):
                         props.get('pollingEnabled', False) in (True, 'true', 'True'),
                         activity_probe=props.get('activityProbeEnabled', True) in (True, 'true', 'True'),
                         health_interval=int(props.get('healthInterval', 30)),
-                        fault_interval=int(props.get('faultInterval', 60)))
+                        fault_interval=int(props.get('faultInterval', 60)),
+                        heater_timezone=str(props.get('heaterTimeZone', 'Europe/Paris')).strip())
 
     def validateDeviceConfigUi(self, valuesDict, typeId, devId):
         errors = indigo.Dict()
@@ -242,7 +281,9 @@ class Plugin(indigo.PluginBase):
         updates = [{'key': 'dataValid', 'value': False}, {'key': 'status', 'value': reason}]
         updates.extend({'key': key + 'Valid', 'value': False} for key in self._keys(dev))
         if dev.deviceTypeId == 'viessmannSystem':
-            updates.extend([{'key': 'productionStatusValid', 'value': False},
+            updates.extend([{'key': 'holidayValid', 'value': False},
+                            {'key': 'holidayStatus', 'value': 'Unknown'},
+                            {'key': 'productionStatusValid', 'value': False},
                             {'key': 'burnerOutputValid', 'value': False},
                             {'key': 'burnerStatusValid', 'value': False},
                             {'key': 'tcpAvailable', 'value': False},
@@ -270,6 +311,9 @@ class Plugin(indigo.PluginBase):
                    {'key': 'healthError', 'value': result.health_error}]
         if result.health_checked:
             updates.append({'key': 'lastHealthCheck', 'value': result.health_checked})
+            zone = self.manager.settings.heater_timezone if self.manager.settings else 'Europe/Paris'
+            local = datetime.fromisoformat(result.health_checked).astimezone(ZoneInfo(zone))
+            updates.append({'key': 'lastHealthCheckLocal', 'value': local.strftime('%Y-%m-%d %H:%M:%S %Z')})
         if result.system_time:
             updates.append({'key': 'controllerTime', 'value': result.system_time})
         return updates
@@ -297,7 +341,7 @@ class Plugin(indigo.PluginBase):
         status = self._system_status(result)
         if result.simulator:
             status = 'SIMULATOR · ' + status
-        updates = self._health_updates(result) + self._clock_success_updates(dev, result) + [
+        updates = self._health_updates(result) + self._holiday_updates(result) + self._clock_success_updates(dev, result) + [
             {'key': 'status', 'value': status},
             {'key': 'tcpAvailable', 'value': result.tcp_available}]
         if result.optical_checked:
@@ -408,6 +452,7 @@ class Plugin(indigo.PluginBase):
                        {'key': 'lastError', 'value': '; '.join(errors)[:800]}]
             if dev.deviceTypeId == 'viessmannSystem':
                 updates.extend(self._health_updates(result))
+                updates.extend(self._holiday_updates(result))
                 updates.extend([{'key': 'tcpAvailable', 'value': result.tcp_available},
                                 {'key': 'opticalActivity', 'value': result.optical_activity},
                                 {'key': 'opticalActivityDetected', 'value': result.optical_activity == 'Detected'},
@@ -478,6 +523,28 @@ class Plugin(indigo.PluginBase):
                 dev = self._device(device_id)
                 if (dev is not None and device_id in self.active and self.manager.settings is not None
                         and (device_id == self.system_id or str(dev.pluginProps.get('systemId', '')) == str(self.system_id))):
+                    self.manager.request_poll()
+                continue
+            if action == 'holiday':
+                ident, departure, returning, expected = device_id
+                self._configure()
+                dev = self._device(ident)
+                if dev is None:
+                    continue
+                try:
+                    if ident != self.system_id or expected is None or self.manager.settings != expected:
+                        raise ValueError('Configuration changed before holiday action; retry explicitly')
+                    actual = self.manager.write_holiday(departure, returning, self.closing.is_set)
+                    dev.updateStatesOnServer([{'key': k, 'value': v} for k, v in actual.items()] + [
+                        {'key': 'holidayValid', 'value': True}, {'key': 'holidayError', 'value': ''},
+                        {'key': 'holidayUpdated', 'value': datetime.now(timezone.utc).isoformat(timespec='seconds')},
+                        {'key': 'holidayActionStatus', 'value': 'Holiday dates readback confirmed'}])
+                except (OSError, ValueError, TypeError, KeyError) as exc:
+                    dev.updateStatesOnServer([{'key': 'holidayValid', 'value': False},
+                        {'key': 'holidayStatus', 'value': 'Unknown'},
+                        {'key': 'holidayActionStatus', 'value': str(exc)}])
+                    self.logger.error('Holiday action rejected/failed: %s', exc)
+                finally:
                     self.manager.request_poll()
                 continue
             if action == 'write':

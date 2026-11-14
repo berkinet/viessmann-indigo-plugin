@@ -18,4 +18,13 @@
       </Field>
     </ConfigUI>
   </Action>
+  <Action id="setHoliday" deviceFilter="self.viessmannSystem">
+    <Name>Set holiday departure and return dates</Name>
+    <CallbackMethod>setHoliday</CallbackMethod>
+    <ConfigUI>
+      <Field id="departure" type="textfield"><Label>Departure date (YYYY-MM-DD):</Label></Field>
+      <Field id="returning" type="textfield"><Label>Return date (YYYY-MM-DD):</Label></Field>
+      <Field id="holidayHelp" type="label"><Label>Heater-local travel dates. Holiday operation starts the day after departure and ends at midnight on return. Departure must be today or later, with at least one full day away. Requires live-write opt-in and a UTC vcontrold daemon. Both writes require acknowledgement and matching readback. Failure can leave a partial schedule; inspect the readback before retrying. Replacing an active holiday is not supported.</Label></Field>
+    </ConfigUI>
+  </Action>
 </Actions>
