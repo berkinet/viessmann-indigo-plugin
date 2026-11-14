@@ -31,6 +31,7 @@ class FixtureServer(socketserver.ThreadingTCPServer):
         self.clock_reply = '2026-11-13T14:37:23+0000'
         self.targets = {'getRoomTempSP': '19', 'getTempWWsoll': '50'}
         self.output_reply = '4B 01'
+        self.production_reply = '00 00 00 00'
         self.burner_reply = '01'
         self.relay_reply = '83 80'
         self.error_reply = '2026-11-13T14:30:08+0000 Burner Fault (D1)'
@@ -68,6 +69,8 @@ class FixtureServer(socketserver.ThreadingTCPServer):
                             reply = owner.activity_reply + '\nvctrld> '
                         elif command == 'getProbeOutputStatus':
                             reply = owner.output_reply + '\nvctrld> '
+                        elif command == 'getProbeProductionStatus':
+                            reply = owner.production_reply + '\nvctrld> '
                         elif command == 'getProbeBurner1':
                             reply = owner.burner_reply + '\nvctrld> '
                         elif command == 'getError0':
@@ -309,6 +312,30 @@ class TransportTests(unittest.TestCase):
                 self.assertIsNone(result.burner_output)
                 self.assertTrue(result.burner_output_error)
                 self.assertTrue(result.active_fault_known)
+        finally:
+            client.disconnect(); server.stop()
+
+    def test_production_status_extracts_each_catalog_bit_from_full_block(self):
+        server = FixtureServer()
+        client = Client(server.settings())
+        keys = ('productionFault', 'productionHardBlock', 'productionSpecialOperation', 'productionStorageCharging')
+        try:
+            for reply, active in [('00 00 04 00', {keys[0]}), ('00 00 01 00', {keys[1]}),
+                                  ('00 00 08 00', {keys[2]}), ('00 02 00 00', {keys[3]}),
+                                  ('00 02 0D 00', set(keys)), ('04 00 00 00', set()),
+                                  ('00 00 00 00', set())]:
+                server.production_reply = reply
+                result = client.fault()
+                self.assertEqual({key for key, value in result.production_status.items() if value}, active)
+                self.assertEqual(result.production_status_raw, reply)
+                self.assertTrue(result.production_status_checked)
+            for reply in ('00', '00 00 00', '00 00 00 00 00', 'FF FF FF FF', '05 05 05 05', 'ERR: timeout', 'UNKNOWN'):
+                server.production_reply = reply
+                result = client.fault()
+                self.assertIsNone(result.production_status)
+                self.assertTrue(result.production_status_error)
+                self.assertEqual(result.production_status_raw, reply)
+                self.assertEqual(result.burner_output, 37.5)
         finally:
             client.disconnect(); server.stop()
 
@@ -589,6 +616,23 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(dev.states['burnerOutput'], 0)
         self.assertFalse(dev.states['burnerOutputValid'])
         self.assertEqual(dev.icon, 'idle')
+
+    def test_production_flags_retain_values_on_failure_and_do_not_override_fault_display(self):
+        dev = self.devices[1]
+        self.plugin._publish(Result(health_only=True, fault_only=True, health_ok=True, tcp_available=True,
+                                    production_status={'productionFault': True, 'productionHardBlock': False,
+                                                       'productionSpecialOperation': False, 'productionStorageCharging': True},
+                                    production_status_raw='00 02 04 00', production_status_checked='2026-11-14T12:00:00+00:00'))
+        self.assertTrue(dev.states['productionFault'])
+        self.assertTrue(dev.states['productionStatusValid'])
+        self.assertEqual(dev.states['status'], 'Online')
+        self.plugin._publish(Result(health_only=True, fault_only=True, health_ok=True, tcp_available=True,
+                                    production_status_raw='FF FF FF FF', production_status_error='unavailable'))
+        self.assertFalse(dev.states['productionStatusValid'])
+        self.assertTrue(dev.states['productionFault'])
+        self.assertEqual(dev.states['productionStatusUpdated'], '2026-11-14T12:00:00+00:00')
+        self.plugin._unavailable(dev, 'Polling disabled')
+        self.assertFalse(dev.states['productionStatusValid'])
 
     def test_child_icons_are_fixed_and_system_activity_is_separate_from_fault(self):
         self.assertEqual(self.devices[2].icon, 'temp')

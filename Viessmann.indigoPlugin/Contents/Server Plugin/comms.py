@@ -78,6 +78,10 @@ class Result:
     relay_status: str = ''
     fault_checked: str = ''
     fault_error: str = ''
+    production_status: dict | None = None
+    production_status_raw: str = ''
+    production_status_checked: str = ''
+    production_status_error: str = ''
     burner_status: str = ''
     burner_checked: str = ''
     burner_output: float | None = None
@@ -129,7 +133,7 @@ class Client:
         return frame.decode('ascii').strip()
 
     def _exchange(self, command, cancelled):
-        allowed = set(READS.values()) | {v[0] for v in TARGETS.values()} | {'getProbeRoomTemp', 'getSystemTime', 'getError0', 'getProbeRelayStatus', 'getProbeBurner1', 'getProbeOutputStatus', 'device', 'close'}
+        allowed = set(READS.values()) | {v[0] for v in TARGETS.values()} | {'getProbeRoomTemp', 'getSystemTime', 'getError0', 'getProbeRelayStatus', 'getProbeProductionStatus', 'getProbeBurner1', 'getProbeOutputStatus', 'device', 'close'}
         if command not in allowed:
             raise ValueError('Command is not an allowed read or link release')
         self.sock.settimeout(self.settings.timeout)
@@ -227,7 +231,7 @@ class Client:
             self.disconnect()
             return result
         errors = []
-        for command, attribute in [('getError0', 'fault_record'), ('getProbeRelayStatus', 'relay_status'), ('getProbeBurner1', 'burner_status'), ('getProbeOutputStatus', 'burner_output')]:
+        for command, attribute in [('getError0', 'fault_record'), ('getProbeRelayStatus', 'relay_status'), ('getProbeProductionStatus', 'production_status'), ('getProbeBurner1', 'burner_status'), ('getProbeOutputStatus', 'burner_output')]:
             try:
                 text = self._exchange(command, cancelled)
             except (OSError, ValueError, UnicodeError) as exc:
@@ -237,6 +241,8 @@ class Client:
             try:
                 if attribute == 'burner_output':
                     result.burner_output_raw = text
+                elif attribute == 'production_status':
+                    result.production_status_raw = text
                 if not text or 'ERR' in text or 'UNKNOWN' in text or 'Error executing' in text:
                     raise ValueError('Fault sampling failed: ' + text[:160])
                 if attribute == 'relay_status':
@@ -244,6 +250,19 @@ class Client:
                         raise ValueError('Invalid relay status: ' + text[:160])
                     if bytes.fromhex(text) == b'\x05\x05':
                         raise ValueError('Suspect synchronization bytes in relay status: 05 05')
+                elif attribute == 'production_status':
+                    if not re.fullmatch(r'[0-9A-Fa-f]{2}(?: [0-9A-Fa-f]{2}){3}', text):
+                        raise ValueError('Invalid four-byte production status: ' + text[:160])
+                    raw = bytes.fromhex(text)
+                    if raw in (b'\x05' * 4, b'\xff' * 4):
+                        raise ValueError('Unavailable or suspect production status: ' + text[:160])
+                    # KO2B catalog: MSB-first bit positions 21, 23, 20, 14.
+                    # These are Vitotronic production flags, not Siemens flame proof.
+                    text = {'productionFault': bool(raw[2] & 0x04),
+                            'productionHardBlock': bool(raw[2] & 0x01),
+                            'productionSpecialOperation': bool(raw[2] & 0x08),
+                            'productionStorageCharging': bool(raw[1] & 0x02)}
+                    result.production_status_checked = datetime.now(timezone.utc).isoformat(timespec='seconds')
                 elif attribute == 'burner_status':
                     if text not in ('00', '01'):
                         raise ValueError('Invalid burner activity: ' + text[:160])
@@ -267,6 +286,8 @@ class Client:
                 errors.append(str(exc))
                 if attribute == 'burner_output':
                     result.burner_output_error = str(exc)
+                elif attribute == 'production_status':
+                    result.production_status_error = str(exc)
         result.fault_error = '; '.join(errors)
         if result.relay_status and (result.live_identity or result.simulator):
             # Provisional mapping observed across D1 and owner-confirmed recovery.

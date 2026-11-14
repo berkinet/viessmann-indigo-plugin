@@ -37,6 +37,14 @@
       <Field id="SupportsStatusRequest" type="checkbox" defaultValue="true" hidden="true" />
     </ConfigUI>
     <States>
+      <State id="productionFault"><ValueType>Boolean</ValueType><TriggerLabel>Production fault flag</TriggerLabel><ControlPageLabel>Production fault flag</ControlPageLabel></State>
+      <State id="productionHardBlock"><ValueType>Boolean</ValueType><TriggerLabel>Production hard block — not verified burner lockout</TriggerLabel><ControlPageLabel>Production hard block — not verified burner lockout</ControlPageLabel></State>
+      <State id="productionSpecialOperation"><ValueType>Boolean</ValueType><TriggerLabel>Production special operation</TriggerLabel><ControlPageLabel>Production special operation</ControlPageLabel></State>
+      <State id="productionStorageCharging"><ValueType>Boolean</ValueType><TriggerLabel>Production storage charging</TriggerLabel><ControlPageLabel>Production storage charging</ControlPageLabel></State>
+      <State id="productionStatusValid"><ValueType>Boolean</ValueType><TriggerLabel>Production status reading valid</TriggerLabel><ControlPageLabel>Production status reading valid</ControlPageLabel></State>
+      <State id="productionStatusRaw"><ValueType>String</ValueType><TriggerLabel>Production status raw four bytes</TriggerLabel><ControlPageLabel>Production status raw four bytes</ControlPageLabel></State>
+      <State id="productionStatusUpdated"><ValueType>String</ValueType><TriggerLabel>Production status last success (UTC)</TriggerLabel><ControlPageLabel>Production status last success (UTC)</ControlPageLabel></State>
+      <State id="productionStatusError"><ValueType>String</ValueType><TriggerLabel>Production status read error</TriggerLabel><ControlPageLabel>Production status read error</ControlPageLabel></State>
       <State id="burnerOutput"><ValueType>Number</ValueType><TriggerLabel>Burner output (%) — provisional</TriggerLabel><ControlPageLabel>Burner output (%) — provisional</ControlPageLabel></State>
       <State id="burnerOutputStatus"><ValueType>Number</ValueType><TriggerLabel>Burner output status byte — provisional</TriggerLabel><ControlPageLabel>Burner output status byte — provisional</ControlPageLabel></State>
       <State id="burnerOutputValid"><ValueType>Boolean</ValueType><TriggerLabel>Burner output reading valid</TriggerLabel><ControlPageLabel>Burner output reading valid</ControlPageLabel></State>

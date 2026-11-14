@@ -85,3 +85,11 @@ The owner's trigger time and a last-success timestamp can differ. For example th
 4. Compare the model-linked boiler-output alternative only if the first two steps leave a useful question unanswered.
 
 These reads require correct XML lengths and serialized optical ownership. They have not been installed or run in this research turn. The report identifies concrete candidates and their exact layouts; it does not claim that either block supplies actual flame or that its catalog bit meanings have already been verified on the installed unit.
+
+## Implementation approved after review — 0.2.18
+
+The owner subsequently authorized the correct getProbeProductionStatus decoder. The live XML now requests four raw bytes, verified with the daemon's detail command; tools/production/update_production_status_command.py records a timestamped backup. Plugin 0.2.18 samples it on the existing fault/status interval and publishes productionFault, productionHardBlock, productionSpecialOperation, productionStorageCharging, productionStatusRaw, productionStatusValid, productionStatusUpdated and productionStatusError.
+
+The masks are those in the table above. The four flags describe Vitotronic production state, not direct Siemens status. They do not alter the existing system display, icon, write permissions or active-fault heuristic pending physical validation. Invalid/error/truncated, all-FF and all-05 replies retain prior flags/timestamp with validity false; valid all-zero is accepted. Existing simulator builds require a four-byte fixture for this new diagnostic.
+
+Validation: 52 offline tests passed. Each bit was checked separately and in combination, including a misleading first-byte bit to guard against wrong offset; failure isolation preserves other diagnostics, and state retention/invalidity is covered. No heater setting/reset was issued. Installation remains owner-managed from the GitHub release ZIP.

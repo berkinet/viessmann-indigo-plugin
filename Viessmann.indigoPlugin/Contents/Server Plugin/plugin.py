@@ -231,7 +231,8 @@ class Plugin(indigo.PluginBase):
         updates = [{'key': 'dataValid', 'value': False}, {'key': 'status', 'value': reason}]
         updates.extend({'key': key + 'Valid', 'value': False} for key in self._keys(dev))
         if dev.deviceTypeId == 'viessmannSystem':
-            updates.extend([{'key': 'burnerOutputValid', 'value': False},
+            updates.extend([{'key': 'productionStatusValid', 'value': False},
+                            {'key': 'burnerOutputValid', 'value': False},
                             {'key': 'burnerStatusValid', 'value': False},
                             {'key': 'tcpAvailable', 'value': False},
                             {'key': 'opticalActivity', 'value': 'Unavailable'},
@@ -294,8 +295,16 @@ class Plugin(indigo.PluginBase):
                             {'key': 'opticalActivityError', 'value': result.optical_error}])
         if not result.health_ok:
             updates.extend([{'key': 'burnerStatusValid', 'value': False},
-                            {'key': 'burnerOutputValid', 'value': False}])
+                            {'key': 'burnerOutputValid', 'value': False},
+                            {'key': 'productionStatusValid', 'value': False}])
         if result.fault_only:
+            updates.extend([{'key': 'productionStatusValid', 'value': result.production_status is not None},
+                            {'key': 'productionStatusError', 'value': result.production_status_error}])
+            if result.production_status_raw:
+                updates.append({'key': 'productionStatusRaw', 'value': result.production_status_raw})
+            if result.production_status is not None:
+                updates.extend({'key': key, 'value': value} for key, value in result.production_status.items())
+                updates.append({'key': 'productionStatusUpdated', 'value': result.production_status_checked})
             updates.extend([{'key': 'burnerOutputValid', 'value': result.burner_output is not None},
                             {'key': 'burnerOutputError', 'value': result.burner_output_error}])
             if result.burner_output_raw:
