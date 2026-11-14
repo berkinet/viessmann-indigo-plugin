@@ -600,8 +600,8 @@ class AdapterTests(unittest.TestCase):
         dev = self.devices[1]
         before = dict(dev.states)
         self.plugin._update_state_icon(dev, [
-            {'key': 'healthValid', 'value': True}, {'key': 'burnerStatusValid', 'value': True},
-            {'key': 'burnerActive', 'value': True}, {'key': 'status', 'value': 'Online'}])
+            {'key': 'healthValid', 'value': True}, {'key': 'burnerOutputValid', 'value': True},
+            {'key': 'burnerOutput', 'value': 100}, {'key': 'status', 'value': 'Online'}])
         self.assertEqual(dev.icon, 'heating')
         self.assertEqual(dev.states, before)
         self.plugin._publish(Result(health_only=True, fault_only=True, health_ok=True, tcp_available=True,
@@ -615,7 +615,26 @@ class AdapterTests(unittest.TestCase):
                                     burner_status='00', burner_output_error='read failed'))
         self.assertEqual(dev.states['burnerOutput'], 0)
         self.assertFalse(dev.states['burnerOutputValid'])
+        self.assertEqual(dev.icon, 'unknown')
+
+    def test_output_drives_icon_and_conflicting_enable_is_logged_once(self):
+        dev = self.devices[1]
+        dev.states.update(healthValid=True, burnerOutputValid=True, burnerStatusValid=True,
+                          burnerOutput=100, burnerActive=False, status='Online')
+        with self.assertLogs('test', level='ERROR') as captured:
+            self.plugin._update_state_icon(dev)
+            self.plugin._update_state_icon(dev)
+        self.assertEqual(len(captured.output), 1)
+        self.assertEqual(dev.icon, 'heating')
+        dev.states.update(burnerOutput=0, burnerActive=True)
+        self.plugin._update_state_icon(dev)
         self.assertEqual(dev.icon, 'idle')
+        dev.states.update(burnerOutput=100, burnerOutputValid=False)
+        self.plugin._update_state_icon(dev)
+        self.assertEqual(dev.icon, 'unknown')
+        dev.states['status'] = 'Error D1'
+        self.plugin._update_state_icon(dev)
+        self.assertEqual(dev.icon, 'fault')
 
     def test_production_flags_retain_values_on_failure_and_do_not_override_fault_display(self):
         dev = self.devices[1]
@@ -638,13 +657,13 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(self.devices[2].icon, 'temp')
         self.assertEqual(self.devices[3].icon, 'temp')
         active = Result(health_only=True, fault_only=True, tcp_available=True, health_ok=True,
-                        active_fault_known=True, burner_status='01', burner_checked='2026-11-13T15:00:00+00:00')
+                        active_fault_known=True, burner_status='01', burner_output=100, burner_checked='2026-11-13T15:00:00+00:00')
         self.plugin._publish(active)
         self.assertEqual(self.devices[1].icon, 'heating')
         self.plugin._publish(Result(health_only=True, tcp_available=True, health_ok=True))
         self.assertEqual(self.devices[1].icon, 'heating')
         self.plugin._publish(Result(health_only=True, fault_only=True, tcp_available=True, health_ok=True,
-                                    active_fault_known=True, burner_status='00'))
+                                    active_fault_known=True, burner_status='00', burner_output=0))
         self.assertEqual(self.devices[1].icon, 'idle')
         self.plugin._publish(Result(health_only=True, fault_only=True, tcp_available=True, health_ok=True,
                                     active_fault_known=True, verified_active_fault_code='D1', burner_status='01'))

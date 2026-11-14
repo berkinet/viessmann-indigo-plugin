@@ -18,6 +18,7 @@ class Plugin(indigo.PluginBase):
         self.pending_lock = threading.RLock()
         self.established_fault = ''
         self.state_images = {}
+        self.burner_inconsistencies = set()
 
     def closedPrefsConfigUi(self, valuesDict, userCancelled):
         if not userCancelled:
@@ -40,14 +41,24 @@ class Plugin(indigo.PluginBase):
     def _update_state_icon(self, dev, updates=()):
         states = dict(dev.states)
         states.update({item['key']: item['value'] for item in updates})
+        if dev.deviceTypeId == 'viessmannSystem':
+            comparable = (states.get('healthValid', False) and states.get('burnerOutputValid', False)
+                          and states.get('burnerStatusValid', False))
+            if comparable:
+                inconsistent = states.get('burnerOutput', 0) > 0 and not states.get('burnerActive', False)
+                if inconsistent and dev.id not in self.burner_inconsistencies:
+                    self.logger.error('%s: inconsistent burner readings: output is nonzero while burner active is off; readings are sequential, so a transition may explain a single occurrence.', dev.name)
+                    self.burner_inconsistencies.add(dev.id)
+                elif not inconsistent:
+                    self.burner_inconsistencies.discard(dev.id)
         if dev.deviceTypeId != 'viessmannSystem':
             selector = indigo.kStateImageSel.TemperatureSensor
         elif str(states.get('status', '')).startswith(('Error ', 'SIMULATOR · Error ')):
             selector = indigo.kStateImageSel.SensorTripped
-        elif not states.get('burnerStatusValid', False) or not states.get('healthValid', False):
+        elif not states.get('burnerOutputValid', False) or not states.get('healthValid', False):
             selector = indigo.kStateImageSel.SensorOff
         else:
-            selector = (indigo.kStateImageSel.HvacHeating if states.get('burnerActive', False)
+            selector = (indigo.kStateImageSel.HvacHeating if states.get('burnerOutput', 0) > 0
                         else indigo.kStateImageSel.HvacOff)
         if self.state_images.get(dev.id) != selector:
             dev.updateStateImageOnServer(selector)

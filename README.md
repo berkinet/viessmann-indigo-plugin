@@ -29,3 +29,11 @@ python3 -m unittest discover -s tests -v
 Public repository: https://github.com/berkinet/viessmann-indigo-plugin
 
 Version 0.2.16 includes the owner-approved persistent-link and provisional fault-display changes. Install the release asset from GitHub. See [persistent communications](docs/persistent-communications.md).
+
+## Version 0.2.19
+
+The system heating icon now follows valid nonzero `burnerOutput`, with healthy communications required. Invalid output uses the unknown icon; a reported system error keeps priority. System status text and the two thermostat icons are unchanged.
+
+When valid readings show nonzero output while `burnerActive` is false, the plugin logs an error once per conflicting episode. A valid consistent pair allows a future episode to be logged; invalid readings do not clear the episode. Reads are sequential, so a single occurrence can reflect a transition between requests.
+
+The state selectors now say **Burner active** and **Burner active reading valid**, retaining their existing state IDs. See [burner enable versus firing research](docs/burner-enable-versus-firing-2026-11-14.md) for interpretation limits.
