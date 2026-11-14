@@ -52,7 +52,7 @@
       <State id="burnerOutputRaw"><ValueType>String</ValueType><TriggerLabel>Burner output raw daemon response</TriggerLabel><ControlPageLabel>Burner output raw daemon response</ControlPageLabel></State>
       <State id="burnerOutputError"><ValueType>String</ValueType><TriggerLabel>Burner output read error</TriggerLabel><ControlPageLabel>Burner output read error</ControlPageLabel></State>
 
-      <State id="burnerActive"><ValueType>Boolean</ValueType><TriggerLabel>Burner stage-1 output active (provisional)</TriggerLabel><ControlPageLabel>Burner stage-1 output active (provisional)</ControlPageLabel></State>
+      <State id="burnerActive"><ValueType>Boolean</ValueType><TriggerLabel>Burner active</TriggerLabel><ControlPageLabel>Burner active</ControlPageLabel></State>
       <State id="burnerStatusValid"><ValueType>Boolean</ValueType><TriggerLabel>Burner activity reading valid</TriggerLabel><ControlPageLabel>Burner activity reading valid</ControlPageLabel></State>
       <State id="burnerStatusRaw"><ValueType>String</ValueType><TriggerLabel>Raw burner activity</TriggerLabel><ControlPageLabel>Raw burner activity</ControlPageLabel></State>
       <State id="burnerStatusUpdated"><ValueType>String</ValueType><TriggerLabel>Burner activity last success (UTC)</TriggerLabel><ControlPageLabel>Burner activity last success (UTC)</ControlPageLabel></State>
