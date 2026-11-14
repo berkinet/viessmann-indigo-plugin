@@ -1,0 +1,22 @@
+[
+  {
+    "utc": "2026-11-14T11:12:11.060042+00:00",
+    "command": "device",
+    "reply": "V200KO2B (ID=209F) (Protocol=KW2)"
+  },
+  {
+    "utc": "2026-11-14T11:12:12.924060+00:00",
+    "command": "getSystemTime",
+    "reply": "2026-11-14T12:01:18+0000"
+  },
+  {
+    "utc": "2026-11-14T11:12:15+00:00",
+    "command": "getStatusFlamme",
+    "reply": "FF"
+  },
+  {
+    "utc": "2026-11-14T11:12:17.068019+00:00",
+    "command": "getStatusFlamme",
+    "reply": "FF"
+  }
+]

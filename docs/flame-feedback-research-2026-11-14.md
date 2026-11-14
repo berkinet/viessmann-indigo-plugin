@@ -36,3 +36,11 @@ An explicit flame signal exists in other Viessmann systems, so the broader searc
 The owner's 14 November photograph identifies the installed burner control as Siemens **LMO64.301C2V**, Siemens order code **S55333-B402-A100**, Viessmann **VI9668559**. Label supply: 230 V AC, 50–60 Hz; TSA max 10 s, t8=90 s. Photo source: /Users/rdp/Desktop/Screenshots/Siemens-burnet-controller.jpg. A still photograph shows green illumination but cannot establish steady versus flashing. Earlier LMO14 identification was an assumption from a family manual and is superseded.
 
 Siemens LMO64 datasheet CC1N7138en explicitly supports OCI400/ACS410 and describes unidirectional UDS transmission of operational status, faults and service information in diagnostic mode. Compatibility at family level is now supported; continuous normal-operation capture and exact Viessmann variant behavior remain unverified. Primary document: https://sid.siemens.com/api/khub/documents/TYtoZZmW~TAs9jeFy7WJAg/content .
+
+## Owner-authorized getStatusFlamme candidate read
+
+Added getStatusFlamme as getaddr, raw one byte, KO2B/209F-scoped, using the 55DD candidate from other models. No FLS enum or implied Boolean interpretation. tools/production/add_flame_candidate_command.py preserves a timestamped original XML backup. It remains a manual diagnostic, not periodic plugin polling.
+
+On 14 November at 12:12:15 and 12:12:17 Paris, both replies were FF. A preceding getSystemTime succeeded and metadata confirmed V200KO2B/209F/KW2. FF is not a verified flame code and does not establish on/off; it may indicate an unsupported/unavailable field or another encoding. The 00/0B examples from other models cannot decode it. No alternative address was queried in this test.
+
+To avoid competing optical clients, stopped the production service, ran a temporary loopback-only diagnostic daemon on 3004, closed its socket and terminated it, then restored the production service in a finally block. This did not reset the heater or issue any setter. Raw transcript: sources/flame-candidate-2026-11-14.json. The owner had earlier confirmed stable green, but no contemporaneous independent LED observation was supplied for these exact samples.
