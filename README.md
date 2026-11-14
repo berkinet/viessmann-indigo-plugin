@@ -51,3 +51,7 @@ See [verified holiday commands and tests](docs/holiday-command-tests-2026-11-14.
 ## Version 0.2.21
 
 Dedicated Clear holiday dates action writes both 1970-01-01 reset dates and confirms Unset by readback. Normal date-setting still rejects past dates. Live clear effectiveness awaits owner testing.
+
+## Version 0.2.22
+
+The optional holiday control-page date variables follow confirmed heater date changes and successful Set/Clear readback. Unchanged polls preserve edits. External date changes replace edits with reported dates. Clear was live-tested successfully by the owner.

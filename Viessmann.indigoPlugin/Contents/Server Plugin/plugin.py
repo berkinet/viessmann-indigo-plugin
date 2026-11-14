@@ -121,12 +121,26 @@ class Plugin(indigo.PluginBase):
         dev.updateStatesOnServer([{'key': 'holidayActionStatus', 'value': 'Pending holiday clear confirmation'}])
         self.events.put(('clearHoliday', (dev.id, '1970-01-01', '1970-01-01', self.manager.settings)))
 
-    @staticmethod
-    def _holiday_updates(result):
+    def _sync_holiday_page(self, holiday, force=False):
+        # Optional control-page input variables. Refresh on actual changes only,
+        # so routine polling cannot erase dates the owner is currently editing.
+        pair = (holiday['holidayDeparture'], holiday['holidayReturn'])
+        if not force and getattr(self, '_holiday_page_pair', None) == pair:
+            return
+        variables = getattr(indigo, 'variables', None)
+        if variables is None:
+            return
+        for name, value in zip(('vitoHolidayDepartureDraft', 'vitoHolidayReturnDraft'), pair):
+            if name in variables:
+                indigo.variable.updateValue(variables[name].id, value=value)
+        self._holiday_page_pair = pair
+
+    def _holiday_updates(self, result):
         if result.holiday_attempted:
             updates = [{'key': 'holidayValid', 'value': result.holiday is not None},
                        {'key': 'holidayError', 'value': result.holiday_error}]
             if result.holiday is not None:
+                self._sync_holiday_page(result.holiday)
                 updates.extend({'key': k, 'value': v} for k, v in result.holiday.items())
                 updates.append({'key': 'holidayUpdated', 'value': result.holiday_checked})
             else:
@@ -542,6 +556,7 @@ class Plugin(indigo.PluginBase):
                     if ident != self.system_id or expected is None or self.manager.settings != expected:
                         raise ValueError('Configuration changed before holiday action; retry explicitly')
                     actual = self.manager.write_holiday(departure, returning, self.closing.is_set, clear=action == 'clearHoliday')
+                    self._sync_holiday_page(actual, force=True)
                     dev.updateStatesOnServer([{'key': k, 'value': v} for k, v in actual.items()] + [
                         {'key': 'holidayValid', 'value': True}, {'key': 'holidayError', 'value': ''},
                         {'key': 'holidayUpdated', 'value': datetime.now(timezone.utc).isoformat(timespec='seconds')},

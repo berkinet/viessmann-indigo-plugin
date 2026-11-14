@@ -711,6 +711,27 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(dict((u['key'], u['value']) for u in summer)['lastHealthCheckLocal'], '2026-07-14 16:00:00 CEST')
         with self.assertRaises(ValueError): Settings('localhost', heater_timezone='Invalid/Zone')
 
+    def test_holiday_page_sync_preserves_edits_until_confirmed_change(self):
+        stub = sys.modules['indigo']
+        values = {}
+        stub.variables = {name: types.SimpleNamespace(id=i) for i, name in enumerate(
+            ('vitoHolidayDepartureDraft', 'vitoHolidayReturnDraft'))}
+        stub.variable = types.SimpleNamespace(updateValue=lambda ident, value: values.update({ident: value}))
+        try:
+            actual = {'holidayDeparture': '2090-11-20', 'holidayReturn': '2090-12-13'}
+            self.plugin._sync_holiday_page(actual)
+            self.assertEqual(values[0], '2090-11-20')
+            values[0] = '2090-11-22'
+            self.plugin._sync_holiday_page(actual)
+            self.assertEqual(values[0], '2090-11-22')
+            self.plugin._sync_holiday_page(actual, force=True)
+            self.assertEqual(values[0], '2090-11-20')
+            self.plugin._sync_holiday_page({'holidayDeparture': '', 'holidayReturn': ''})
+            self.assertEqual(values, {0: '', 1: ''})
+        finally:
+            del stub.variables
+            del stub.variable
+
     def test_holiday_publish_and_failed_read_keep_dates_but_mark_unknown(self):
         system = self.devices[1]
         actual = holiday_state('2090-11-20T00:00:00+0000', '2090-12-13T00:00:00+0000', '02')
