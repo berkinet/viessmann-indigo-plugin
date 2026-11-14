@@ -1,0 +1,11 @@
+[Unit]
+Description=Check vcontrold progress every 30 seconds
+
+[Timer]
+OnBootSec=30
+OnUnitInactiveSec=30
+AccuracySec=1
+Unit=viessmann-watchdog.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,8 @@
+[Unit]
+Description=Check vcontrold for a stalled serial lock
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /usr/local/lib/viessmann/watchdog.py
+StateDirectory=viessmann-watchdog
+TimeoutStartSec=55

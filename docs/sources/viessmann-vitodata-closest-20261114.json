@@ -1,0 +1,89 @@
+{
+  "snapshots_compared": 330,
+  "closest": [
+    {
+      "score": 0.4,
+      "values": {
+        "getBoilerTemp": {
+          "value": 56.599998,
+          "observed_utc": "Fri Nov 13 23:57:26"
+        },
+        "getOutsideTemp": {
+          "value": 13.2,
+          "observed_utc": "Fri Nov 13 23:57:28"
+        },
+        "getWaterTemp": {
+          "value": 45.299999,
+          "observed_utc": "Fri Nov 13 23:57:32"
+        },
+        "getProbeRoomTemp": {
+          "value": 20.799999,
+          "observed_utc": "Fri Nov 13 23:57:34"
+        }
+      }
+    },
+    {
+      "score": 0.4,
+      "values": {
+        "getBoilerTemp": {
+          "value": 56.400002,
+          "observed_utc": "Sat Nov 14 00:00:36"
+        },
+        "getOutsideTemp": {
+          "value": 12.7,
+          "observed_utc": "Sat Nov 14 00:00:38"
+        },
+        "getWaterTemp": {
+          "value": 45.200001,
+          "observed_utc": "Sat Nov 14 00:00:42"
+        },
+        "getProbeRoomTemp": {
+          "value": 20.799999,
+          "observed_utc": "Sat Nov 14 00:00:44"
+        }
+      }
+    },
+    {
+      "score": 0.4,
+      "values": {
+        "getBoilerTemp": {
+          "value": 56.299999,
+          "observed_utc": "Sat Nov 14 00:03:49"
+        },
+        "getOutsideTemp": {
+          "value": 12.8,
+          "observed_utc": "Sat Nov 14 00:03:51"
+        },
+        "getWaterTemp": {
+          "value": 45.200001,
+          "observed_utc": "Sat Nov 14 00:03:55"
+        },
+        "getProbeRoomTemp": {
+          "value": 20.799999,
+          "observed_utc": "Sat Nov 14 00:03:57"
+        }
+      }
+    },
+    {
+      "score": 0.5,
+      "values": {
+        "getBoilerTemp": {
+          "value": 56.700001,
+          "observed_utc": "Fri Nov 13 23:54:11"
+        },
+        "getOutsideTemp": {
+          "value": 13.2,
+          "observed_utc": "Fri Nov 13 23:54:13"
+        },
+        "getWaterTemp": {
+          "value": 45.299999,
+          "observed_utc": "Fri Nov 13 23:54:17"
+        },
+        "getProbeRoomTemp": {
+          "value": 20.799999,
+          "observed_utc": "Fri Nov 13 23:54:19"
+        }
+      }
+    }
+  ]
+}

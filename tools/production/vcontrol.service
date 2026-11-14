@@ -1,0 +1,18 @@
+[Unit]
+Description=Viessmann production Optolink daemon
+After=network.target
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=forking
+PIDFile=/run/vcontrold.pid
+ExecStart=/usr/local/sbin/vcontrold -P /run/vcontrold.pid -x /etc/vcontrold/vcontrold.xml -d /dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0 -l /var/log/vcontrold.log
+Restart=on-failure
+RestartSec=10
+TimeoutStartSec=20
+TimeoutStopSec=10
+KillMode=control-group
+
+[Install]
+WantedBy=multi-user.target

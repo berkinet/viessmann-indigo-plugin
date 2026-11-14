@@ -1,0 +1,37 @@
+[
+  {
+    "utc": "2026-11-14T09:38:54.680539+00:00",
+    "command": "reload",
+    "response": "XML file /etc/vcontrold/vcontrold.xml reloaded"
+  },
+  {
+    "utc": "2026-11-14T09:38:55.049423+00:00",
+    "command": "device",
+    "response": "V200KO2B (ID=209F) (Protocol=KW2)"
+  },
+  {
+    "utc": "2026-11-14T09:38:56.606740+00:00",
+    "command": "getSystemTime",
+    "response": "2026-11-14T10:28:02+0000"
+  },
+  {
+    "utc": "2026-11-14T09:38:58.634369+00:00",
+    "command": "getProbeOutputStatus",
+    "response": "C8 01"
+  },
+  {
+    "utc": "2026-11-14T09:39:00.663779+00:00",
+    "command": "getProbeOutputStatus",
+    "response": "C8 01"
+  },
+  {
+    "utc": "2026-11-14T09:39:00.722454+00:00",
+    "command": "error",
+    "response": "daemon disconnected"
+  },
+  {
+    "utc": "2026-11-14T09:39:01.885908+00:00",
+    "command": "restore_reload",
+    "response": "XML file /etc/vcontrold/vcontrold.xml reloaded"
+  }
+]

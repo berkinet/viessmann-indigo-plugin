@@ -6,6 +6,7 @@ The implementation provides three logical devices: **Viessmann system**, **Viess
 
 Native thermostat children display measured room/DHW temperatures and provide opt-in setpoint controls. Live standard-room and DHW setpoint writes require explicit plugin-config opt-in, recent successful controller-clock health, exact KO2B identity, acknowledgement and readback; the option defaults off. Live controller time, temperatures and measured room temperature have been verified; an owner-approved provisional relay-bit interpretation drives the system fault display.
 
+- [Pi-side communications watchdog](docs/communications-watchdog.md)
 - [Device icons and burner diagnostics](docs/device-icons.md)
 - [Native thermostat trial and GitHub installation](docs/thermostat-trial.md)
 - [Receive-only optical activity check](docs/optical-activity.md)
