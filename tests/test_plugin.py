@@ -30,7 +30,7 @@ class FixtureServer(socketserver.ThreadingTCPServer):
         self.activity_reply = 'Result: 05'
         self.clock_reply = '2026-11-13T14:37:23+0000'
         self.targets = {'getRoomTempSP': '19', 'getTempWWsoll': '50'}
-        self.output_reply = '37.5 %'
+        self.output_reply = '4B 01'
         self.burner_reply = '01'
         self.relay_reply = '83 80'
         self.error_reply = '2026-11-13T14:30:08+0000 Burner Fault (D1)'
@@ -66,7 +66,7 @@ class FixtureServer(socketserver.ThreadingTCPServer):
                             if owner.activity_reply is None:
                                 return  # vcontrold exits child on raw read timeout
                             reply = owner.activity_reply + '\nvctrld> '
-                        elif command == 'getBurnerOutput':
+                        elif command == 'getProbeOutputStatus':
                             reply = owner.output_reply + '\nvctrld> '
                         elif command == 'getProbeBurner1':
                             reply = owner.burner_reply + '\nvctrld> '
@@ -292,9 +292,18 @@ class TransportTests(unittest.TestCase):
         client = Client(server.settings())
         try:
             self.assertEqual(client.fault().burner_output, 37.5)
-            server.output_reply = '0 %'
+            server.output_reply = 'C8 01'
+            result = client.fault()
+            self.assertEqual(result.burner_output, 100)
+            self.assertEqual(result.burner_output_status, 1)
+            self.assertEqual(result.burner_output_raw, 'C8 01')
+            server.output_reply = '01 A7'
+            result = client.fault()
+            self.assertEqual(result.burner_output, 0.5)
+            self.assertEqual(result.burner_output_status, 167)  # Unknown status stays diagnostic.
+            server.output_reply = '00 00'
             self.assertEqual(client.fault().burner_output, 0)
-            for reply in ('UNKNOWN', 'ERR: read 5 failed', '101 %', '-1', 'nan', '5 C'):
+            for reply in ('UNKNOWN', 'ERR: read 5 failed', 'FF 01', 'C9 00', '05 05', '05 05 05', '01', '01 00 00', 'GG 01', '37.5 %'):
                 server.output_reply = reply
                 result = client.fault()
                 self.assertIsNone(result.burner_output)
@@ -569,9 +578,10 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(dev.icon, 'heating')
         self.assertEqual(dev.states, before)
         self.plugin._publish(Result(health_only=True, fault_only=True, health_ok=True, tcp_available=True,
-                                    burner_status='00', burner_output=0, burner_output_raw='0 %',
+                                    burner_status='00', burner_output=0, burner_output_status=0, burner_output_raw='00 00',
                                     burner_output_checked='2026-11-13T15:00:00+00:00'))
         self.assertEqual(dev.states['burnerOutput'], 0)
+        self.assertEqual(dev.states['burnerOutputStatus'], 0)
         self.assertTrue(dev.states['burnerOutputValid'])
         self.assertEqual(dev.icon, 'idle')
         self.plugin._publish(Result(health_only=True, fault_only=True, health_ok=True, tcp_available=True,

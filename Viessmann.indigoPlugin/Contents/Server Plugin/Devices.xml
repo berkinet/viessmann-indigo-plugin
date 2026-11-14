@@ -38,6 +38,7 @@
     </ConfigUI>
     <States>
       <State id="burnerOutput"><ValueType>Number</ValueType><TriggerLabel>Burner output (%) — provisional</TriggerLabel><ControlPageLabel>Burner output (%) — provisional</ControlPageLabel></State>
+      <State id="burnerOutputStatus"><ValueType>Number</ValueType><TriggerLabel>Burner output status byte — provisional</TriggerLabel><ControlPageLabel>Burner output status byte — provisional</ControlPageLabel></State>
       <State id="burnerOutputValid"><ValueType>Boolean</ValueType><TriggerLabel>Burner output reading valid</TriggerLabel><ControlPageLabel>Burner output reading valid</ControlPageLabel></State>
       <State id="burnerOutputUpdated"><ValueType>String</ValueType><TriggerLabel>Burner output last success (UTC)</TriggerLabel><ControlPageLabel>Burner output last success (UTC)</ControlPageLabel></State>
       <State id="burnerOutputRaw"><ValueType>String</ValueType><TriggerLabel>Burner output raw daemon response</TriggerLabel><ControlPageLabel>Burner output raw daemon response</ControlPageLabel></State>

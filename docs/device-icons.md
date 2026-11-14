@@ -11,3 +11,13 @@ The system also exposes burnerOutput, burnerOutputValid, burnerOutputUpdated, bu
 getProbeProductionStatus (A395) was also suggested as a burner-on signal. Its first byte returned 00 earlier, but those samples were not a clearly time-aligned confirmed burner-on comparison. Its layout remains unknown; it is neither ruled out nor used for the icon.
 
 Validation: 44 offline tests passed, covering fixed icons, active/idle/unknown/fault precedence, immutable device snapshots, percentage bounds/zero and failed-read retention. Native rendering awaits owner installation/observation. No local upgrade or heater write was performed.
+
+## 0.2.17 — raw two-byte output/status
+
+Periodic fault/status sampling now uses getProbeOutputStatus instead of getBurnerOutput. It requests two raw bytes, with no vcontrold unit conversion. The first byte divided by two populates burnerOutput; only 0–100% is accepted. C8 01 therefore yields 100% and a separate status byte of 1. Intermediate half-percent values remain supported so observations can establish whether this single-stage installation reports only 0/100.
+
+The new numeric system state burnerOutputStatus preserves the second byte without assuming Boolean or flame semantics. burnerOutputRaw contains both hex bytes. burnerOutputValid covers the accepted pair; failed/malformed/out-of-range or suspect 05 05 replies preserve the prior numeric output/status and timestamp while marking validity false and recording an error. Unknown second-byte values remain visible as diagnostics, not assumed active/inactive. This read does not drive the system icon or establish active fault status.
+
+The production XML addition is KO2B/209F-scoped; tools/production/add_output_status_command.py installs it with a timestamped backup. Installed on the Pi before publication, with a communications-daemon restart and metadata verification; no heater reset or setter was issued. Other installations need the matching XML command. Existing simulator builds need the new A38F/2 fixture/command before they can supply this diagnostic; offline fixture tests support it. No unsupported percentage is clamped or converted to an off reading.
+
+Release validation: 50 offline tests passed, covering captured C8 01, zero, half-percent scaling, unknown status-byte preservation, malformed/over-range/synchronization replies, state retention and existing plugin behavior. Build: dist/Viessmann-0.2.17.indigoPlugin.zip. Actual flame correlation remains unresolved.

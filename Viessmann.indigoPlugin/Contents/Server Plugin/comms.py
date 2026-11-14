@@ -81,6 +81,7 @@ class Result:
     burner_status: str = ''
     burner_checked: str = ''
     burner_output: float | None = None
+    burner_output_status: int | None = None
     burner_output_raw: str = ''
     burner_output_checked: str = ''
     burner_output_error: str = ''
@@ -128,7 +129,7 @@ class Client:
         return frame.decode('ascii').strip()
 
     def _exchange(self, command, cancelled):
-        allowed = set(READS.values()) | {v[0] for v in TARGETS.values()} | {'getProbeRoomTemp', 'getSystemTime', 'getError0', 'getProbeRelayStatus', 'getProbeBurner1', 'getBurnerOutput', 'device', 'close'}
+        allowed = set(READS.values()) | {v[0] for v in TARGETS.values()} | {'getProbeRoomTemp', 'getSystemTime', 'getError0', 'getProbeRelayStatus', 'getProbeBurner1', 'getProbeOutputStatus', 'device', 'close'}
         if command not in allowed:
             raise ValueError('Command is not an allowed read or link release')
         self.sock.settimeout(self.settings.timeout)
@@ -226,7 +227,7 @@ class Client:
             self.disconnect()
             return result
         errors = []
-        for command, attribute in [('getError0', 'fault_record'), ('getProbeRelayStatus', 'relay_status'), ('getProbeBurner1', 'burner_status'), ('getBurnerOutput', 'burner_output')]:
+        for command, attribute in [('getError0', 'fault_record'), ('getProbeRelayStatus', 'relay_status'), ('getProbeBurner1', 'burner_status'), ('getProbeOutputStatus', 'burner_output')]:
             try:
                 text = self._exchange(command, cancelled)
             except (OSError, ValueError, UnicodeError) as exc:
@@ -248,10 +249,16 @@ class Client:
                         raise ValueError('Invalid burner activity: ' + text[:160])
                     result.burner_checked = datetime.now(timezone.utc).isoformat(timespec='seconds')
                 elif attribute == 'burner_output':
-                    match = re.fullmatch(r'([+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+))(?:[ \t]*%)?', text)
-                    if not match or not 0 <= float(match.group(1)) <= 100:
-                        raise ValueError('Invalid burner output: ' + text[:160])
-                    text = float(match.group(1))
+                    if not re.fullmatch(r'[0-9A-Fa-f]{2} [0-9A-Fa-f]{2}', text):
+                        raise ValueError('Invalid two-byte output/status: ' + text[:160])
+                    if bytes.fromhex(text) == b'\x05\x05':
+                        raise ValueError('Suspect synchronization bytes in output/status: 05 05')
+                    value, status = bytes.fromhex(text)
+                    if value > 200:
+                        raise ValueError('Invalid burner output byte: ' + text[:160])
+                    # Status is preserved as a byte, not assumed to prove flame.
+                    result.burner_output_status = status
+                    text = value / 2.0
                     result.burner_output_checked = datetime.now(timezone.utc).isoformat(timespec='seconds')
                 elif not re.search(r'\([0-9A-Fa-f]{2}\)$', text):
                     raise ValueError('Invalid error history: ' + text[:160])

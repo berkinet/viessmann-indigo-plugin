@@ -303,6 +303,8 @@ class Plugin(indigo.PluginBase):
             if result.burner_output is not None:
                 updates.extend([{'key': 'burnerOutput', 'value': result.burner_output},
                                 {'key': 'burnerOutputUpdated', 'value': result.burner_output_checked}])
+            if result.burner_output_status is not None:
+                updates.append({'key': 'burnerOutputStatus', 'value': result.burner_output_status})
             burner_valid = result.burner_status in ('00', '01')
             updates.append({'key': 'burnerStatusValid', 'value': burner_valid})
             if burner_valid:
