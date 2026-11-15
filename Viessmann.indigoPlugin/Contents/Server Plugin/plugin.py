@@ -40,10 +40,28 @@ class Plugin(indigo.PluginBase):
         self._update_state_icon(dev)
         self.events.put(('start', dev.id))
 
+    @staticmethod
+    def _burner_state_updates(states):
+        # A valid fault is the master Off gate. Raw telemetry stays untouched.
+        known = False
+        on = False
+        if states.get('healthValid', False):
+            if states.get('productionFault', False):
+                known = True
+            elif states.get('burnerOutputValid', False):
+                output = states.get('burnerOutput', 0)
+                known = True
+                on = output > 0
+        updates = [{'key': 'burnerOnValid', 'value': known}]
+        if known:
+            updates.append({'key': 'burnerOn', 'value': on})
+        return updates
+
     def _update_state_icon(self, dev, updates=()):
         states = dict(dev.states)
         states.update({item['key']: item['value'] for item in updates})
         if dev.deviceTypeId == 'viessmannSystem':
+            states.update({u['key']: u['value'] for u in self._burner_state_updates(states)})
             comparable = (states.get('healthValid', False) and states.get('burnerOutputValid', False)
                           and states.get('burnerStatusValid', False))
             if comparable:
@@ -57,10 +75,10 @@ class Plugin(indigo.PluginBase):
             selector = indigo.kStateImageSel.TemperatureSensor
         elif str(states.get('status', '')).startswith(('Error ', 'SIMULATOR · Error ')):
             selector = indigo.kStateImageSel.SensorTripped
-        elif not states.get('burnerOutputValid', False) or not states.get('healthValid', False):
+        elif not states.get('burnerOnValid', False):
             selector = indigo.kStateImageSel.SensorOff
         else:
-            selector = (indigo.kStateImageSel.HvacHeating if states.get('burnerOutput', 0) > 0
+            selector = (indigo.kStateImageSel.HvacHeating if states.get('burnerOn', False)
                         else indigo.kStateImageSel.HvacOff)
         if self.state_images.get(dev.id) != selector:
             dev.updateStateImageOnServer(selector)
@@ -248,6 +266,10 @@ class Plugin(indigo.PluginBase):
             dev.setErrorStateOnServer(pending['error'])
 
     def _publish_states(self, dev, updates, display_error):
+        if dev.deviceTypeId == 'viessmannSystem':
+            states = dict(dev.states)
+            states.update({item['key']: item['value'] for item in updates})
+            updates = list(updates) + self._burner_state_updates(states)
         with self.pending_lock:
             pending = self.pending_sets.get(dev.id)
             if pending:
@@ -371,6 +393,7 @@ class Plugin(indigo.PluginBase):
                             {'key': 'holidayStatus', 'value': 'Unknown'},
                             {'key': 'productionStatusValid', 'value': False},
                             {'key': 'alarmBlock', 'value': 'Unavailable: ' + reason},
+                            {'key': 'alarmChangeFlagValid', 'value': False},
                             {'key': 'burnerOutputValid', 'value': False},
                             {'key': 'burnerStatusValid', 'value': False},
                             {'key': 'tcpAvailable', 'value': False},
@@ -436,13 +459,17 @@ class Plugin(indigo.PluginBase):
                             {'key': 'opticalActivityDetected', 'value': result.optical_activity == 'Detected'},
                             {'key': 'opticalActivityError', 'value': result.optical_error}])
         if not result.health_ok:
-            updates.append({'key': 'alarmBlock', 'value': 'Unavailable: controller health check failed'})
+            updates.extend([{'key': 'alarmBlock', 'value': 'Unavailable: controller health check failed'},
+                            {'key': 'alarmChangeFlagValid', 'value': False}])
             updates.extend([{'key': 'burnerStatusValid', 'value': False},
                             {'key': 'burnerOutputValid', 'value': False},
                             {'key': 'productionStatusValid', 'value': False}])
         if result.fault_only:
             updates.extend([{'key': 'alarmBlock', 'value': result.alarm or 'Unavailable: ' + (result.fault_error or 'alarm read not completed')},
-                            {'key': 'alarmBlockRaw', 'value': result.alarm_raw}])
+                            {'key': 'alarmBlockRaw', 'value': result.alarm_raw},
+                            {'key': 'alarmChangeFlagValid', 'value': result.alarm_change_flag is not None}])
+            if result.alarm_change_flag is not None:
+                updates.append({'key': 'alarmChangeFlag', 'value': result.alarm_change_flag})
             updates.extend([{'key': 'productionStatusValid', 'value': result.production_status is not None},
                             {'key': 'productionStatusError', 'value': result.production_status_error}])
             if result.production_status_raw:

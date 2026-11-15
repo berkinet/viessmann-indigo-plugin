@@ -96,3 +96,9 @@ current mode. Restore the configured target when party mode is Off, without
 inferring the heating schedule's standard/reduced selection. Preserve unknown
 state and ACK/readback/no-retry safeguards. Owner confirmed clock and party mode
 actions working live in 0.2.24.
+
+Owner clarified the 15 November D1 display rule: productionFault True forces burner
+Off; otherwise preserve the existing burnerOutput algorithm. Do not require a
+new valid production-status read before applying the previous output logic.
+Keep raw burner readings intact and expose a separate validated alarmChangeFlag
+Boolean. Control-page work remains explicitly paused pending owner resumption.

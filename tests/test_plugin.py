@@ -33,6 +33,7 @@ class FixtureServer(socketserver.ThreadingTCPServer):
         self.holidays = {'getHolidayStart': '1970-01-01T00:00:00+0000', 'getHolidayEnd': '1970-01-01T00:00:00+0000'}
         self.party_mode = '0'
         self.holiday_raw = '02'
+        self.alarm_reply = '00 00 00 00 00 00 00 00 00 00 00 00 19 17 21 01 EA 07 0B 0F 0D 06 30 00 00 00 00 00 00'
         self.output_reply = '4B 01'
         self.production_reply = '00 00 00 00'
         self.burner_reply = '01'
@@ -90,7 +91,7 @@ class FixtureServer(socketserver.ThreadingTCPServer):
                         elif command == 'getProbeOutputStatus':
                             reply = owner.output_reply + '\nvctrld> '
                         elif command == 'getProbeAlarmBlockRaw':
-                            reply = '00 00 00 00 00 00 00 00 00 00 00 00 19 17 21 01 EA 07 0B 0F 0D 06 30 00 00 00 00 00 00\nvctrld> '
+                            reply = owner.alarm_reply + '\nvctrld> '
                         elif command == 'getProbeProductionStatus':
                             reply = owner.production_reply + '\nvctrld> '
                         elif command == 'getProbeBurner1':
@@ -629,7 +630,8 @@ class AdapterTests(unittest.TestCase):
         before = dict(dev.states)
         self.plugin._update_state_icon(dev, [
             {'key': 'healthValid', 'value': True}, {'key': 'burnerOutputValid', 'value': True},
-            {'key': 'burnerOutput', 'value': 100}, {'key': 'status', 'value': 'Online'}])
+            {'key': 'burnerOutput', 'value': 100}, {'key': 'status', 'value': 'Online'},
+            {'key': 'productionStatusValid', 'value': True}, {'key': 'productionFault', 'value': False}])
         self.assertEqual(dev.icon, 'heating')
         self.assertEqual(dev.states, before)
         self.plugin._publish(Result(health_only=True, fault_only=True, health_ok=True, tcp_available=True,
@@ -648,7 +650,8 @@ class AdapterTests(unittest.TestCase):
     def test_output_drives_icon_and_conflicting_enable_is_logged_once(self):
         dev = self.devices[1]
         dev.states.update(healthValid=True, burnerOutputValid=True, burnerStatusValid=True,
-                          burnerOutput=100, burnerActive=False, status='Online')
+                          burnerOutput=100, burnerActive=False, status='Online',
+                          productionStatusValid=True, productionFault=False)
         with self.assertLogs('test', level='ERROR') as captured:
             self.plugin._update_state_icon(dev)
             self.plugin._update_state_icon(dev)
@@ -663,6 +666,42 @@ class AdapterTests(unittest.TestCase):
         dev.states['status'] = 'Error D1'
         self.plugin._update_state_icon(dev)
         self.assertEqual(dev.icon, 'fault')
+
+    def test_production_fault_gates_burner_and_alarm_flag_is_independent(self):
+        dev = self.devices[1]
+        def sample(fault, output=100, change=False, alarm='different timestamp'):
+            return Result(health_only=True, fault_only=True, health_ok=True, tcp_available=True,
+                production_status={'productionFault': fault}, burner_output=output,
+                burner_status='01', alarm=alarm, alarm_change_flag=change)
+        self.plugin._publish(sample(False))
+        self.assertTrue(dev.states['burnerOn'])
+        self.assertTrue(dev.states['burnerOnValid'])
+        self.assertEqual(dev.icon, 'heating')
+        self.plugin._publish(sample(True, change=True))
+        self.assertFalse(dev.states['burnerOn'])
+        self.assertTrue(dev.states['burnerOnValid'])
+        self.assertEqual(dev.states['burnerOutput'], 100)
+        self.assertTrue(dev.states['burnerActive'])
+        self.assertEqual(dev.icon, 'idle')
+        self.assertTrue(dev.states['alarmChangeFlag'])
+        self.plugin._publish(sample(True, change=False))
+        self.assertFalse(dev.states['alarmChangeFlag'])
+        self.plugin._publish(sample(True, change=False, alarm='another timestamp'))
+        self.assertFalse(dev.states['alarmChangeFlag'])
+        self.assertTrue(dev.states['alarmChangeFlagValid'])
+        self.plugin._publish(sample(False))
+        self.assertTrue(dev.states['burnerOn'])
+        self.plugin._publish(Result(health_only=True, fault_only=True, health_ok=True,
+                                   burner_output=100, production_status_error='unavailable'))
+        self.assertTrue(dev.states['burnerOnValid'])
+        self.assertTrue(dev.states['burnerOn'])  # no fault override: existing output logic
+        self.assertFalse(dev.states['alarmChangeFlagValid'])
+        self.assertEqual(dev.icon, 'heating')
+        self.plugin._publish(sample(True, output=None))
+        self.assertTrue(dev.states['burnerOnValid'])
+        self.assertFalse(dev.states['burnerOn'])
+        self.plugin._publish(Result(health_only=True, health_ok=False))
+        self.assertFalse(dev.states['burnerOnValid'])
 
     def test_production_flags_retain_values_on_failure_and_do_not_override_fault_display(self):
         dev = self.devices[1]
@@ -1336,6 +1375,22 @@ class ClockPartyTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'readback mismatch'):
                 client.write_control('partyMode', True)
             self.assertEqual(len([c for c in server.commands if c.startswith('setPartyModeA1')]), before + 1)
+            client.disconnect()
+        finally: server.stop()
+
+    def test_alarm_change_flag_decodes_and_rejects_unavailable_block(self):
+        server = FixtureServer()
+        try:
+            client = Client(server.settings())
+            self.assertFalse(client.fault().alarm_change_flag)
+            raw = server.alarm_reply.split()
+            raw[14] = '31'
+            server.alarm_reply = ' '.join(raw)
+            self.assertTrue(client.fault().alarm_change_flag)
+            server.alarm_reply = ' '.join(['FF'] * 29)
+            result = client.fault()
+            self.assertIsNone(result.alarm_change_flag)
+            self.assertIn('Unavailable', result.fault_error)
             client.disconnect()
         finally: server.stop()
 

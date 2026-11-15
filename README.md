@@ -77,3 +77,10 @@ party-mode readback. The heater thermostat automatically follows the party targe
 while mode is On, restores the configured target afterward, and exposes a small
 Party indicator for control pages. Unknown reads remain explicit. See
 [party-mode behavior](docs/clock-party-actions.md#version-0225--live-toggle-and-party-setpoint-following).
+
+## Version 0.2.26
+
+Adds burnerOn with the owner-requested productionFault Off override; otherwise
+the existing burner-output logic applies. Adds alarmChangeFlag and validity
+states so triggers need not watch the timestamp-bearing alarmBlock string.
+See [fault override and alarm flag](docs/burner-fault-override.md).
