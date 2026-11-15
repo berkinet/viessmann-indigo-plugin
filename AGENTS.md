@@ -88,3 +88,11 @@ safeguards. Party temperature is 4–37 C; reduced target remains simulator-only
 Use KO2B party mode at 2330, not legacy 2303. See docs/clock-party-actions.md.
 Clock must use the current Mac instant expressed in heater-local time; the tested
 TI transport requires UTC vcontrold. No automatic synchronization or blind retries.
+
+On 15 November the owner requested one state-displaying party toggle and automatic
+party setpoint display with a small Party label. Mode is read periodically and
+again before toggling; native room writes verify that their target still matches
+current mode. Restore the configured target when party mode is Off, without
+inferring the heating schedule's standard/reduced selection. Preserve unknown
+state and ACK/readback/no-retry safeguards. Owner confirmed clock and party mode
+actions working live in 0.2.24.

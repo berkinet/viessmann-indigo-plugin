@@ -69,3 +69,11 @@ temperature and party On/Off. Existing live-write opt-in is required. Also prese
 native setpoint capabilities through failed reads to avoid recovery schema races.
 See [clock and party actions](docs/clock-party-actions.md) for command evidence,
 validation and readback-state limitations.
+
+## Version 0.2.25
+
+Adds Toggle party mode with a fresh controller read before switching and periodic
+party-mode readback. The heater thermostat automatically follows the party target
+while mode is On, restores the configured target afterward, and exposes a small
+Party indicator for control pages. Unknown reads remain explicit. See
+[party-mode behavior](docs/clock-party-actions.md#version-0225--live-toggle-and-party-setpoint-following).

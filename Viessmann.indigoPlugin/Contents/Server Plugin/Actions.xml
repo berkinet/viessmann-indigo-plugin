@@ -44,4 +44,7 @@
       <List><Option value="on">On</Option><Option value="off">Off</Option></List>
     </Field></ConfigUI>
   </Action>
+  <Action id="togglePartyMode" deviceFilter="self.viessmannHeater">
+    <Name>Toggle party mode</Name><CallbackMethod>togglePartyMode</CallbackMethod>
+  </Action>
 </Actions>

@@ -59,3 +59,32 @@ updates retain the existing state-presence guard.
 Offline coverage includes clock zone conversion/offset rejection, invalid party
 values, opt-in, missing readback/no retry, queued endpoint changes and connection
 loss/recovery without native schema removal. Installation remains owner-managed.
+
+## Version 0.2.25 — live toggle and party setpoint following
+
+Toggle party mode reads getPartyModeA1 at execution and writes its opposite, with
+ACK/readback and no retry. Repeated clicks while the same device has a toggle
+pending coalesce. Explicit On and Off actions remain available.
+
+Party mode and the effective room target are read at each full poll and each
+fault/status sampling interval (normally 60 seconds). This captures external
+changes. partyModeValid, partyModeUpdated and partyModeError describe validity;
+partyModeText is On, Off or Unknown. An old boolean is retained on failure but
+never presented as a valid current mode. No flame/burner inference is involved.
+
+When confirmed On, roomSetpoint and native setpointHeat follow getTempPartyM1.
+Otherwise they return to the configured roomTarget; no configuration is silently
+changed. This is not yet automatic selection between standard/reduced according
+to the heating schedule. selectedTarget identifies the displayed editing target;
+roomTargetIndicator supplies the small Party label on the control page.
+The label and temperature update together after the target has been read.
+
+Native thermostat writes recheck party mode before selecting the register; if it
+changed since the displayed target was chosen, the write is rejected for explicit
+retry after refresh. After switching mode, edits wait for target readback. The
+dedicated Set party room temperature action still edits the party target without
+activating it. Unknown target/mode does not become Off or a valid target.
+
+Owner confirmed live clock synchronization and party-mode actions successful after
+0.2.24 installation. The new transitions/toggle routing were fixture-tested; no
+physical mode changes were performed while developing 0.2.25.

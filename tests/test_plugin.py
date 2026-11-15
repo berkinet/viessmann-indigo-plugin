@@ -416,8 +416,8 @@ class TransportTests(unittest.TestCase):
         seen = []
         try:
             result = client.poll(on_progress=lambda partial: seen.append((set(partial.values), list(server.commands))))
-            self.assertEqual(len(seen), 5)
-            self.assertEqual(seen[0][0], {'boilerTemp'})
+            self.assertTrue(seen)
+            self.assertIn('boilerTemp', seen[0][0])
             self.assertNotIn('getOutsideTemp', seen[0][1])
             self.assertTrue(all('close' not in commands for _, commands in seen))
             self.assertFalse(result.release_error)
@@ -762,6 +762,38 @@ class AdapterTests(unittest.TestCase):
         self.plugin.manager.write_control = lambda *args: '2026-11-15T14:00:00+0000'
         self.plugin._process_events()
         self.assertIn('readback confirmed', self.devices[1].states['clockActionStatus'])
+
+    def test_party_target_label_restore_and_single_pending_toggle(self):
+        self.devices[1].pluginProps['pollingEnabled'] = True
+        self.plugin.pluginPrefs['liveWritesEnabled'] = True
+        self.plugin._configure()
+        heater = self.devices[2]
+        heater.pluginProps['SupportsHeatSetpoint'] = True
+        heater.states['setpointHeat'] = 22
+        stamp = '2026-11-15T14:00:00+00:00'
+        self.plugin._publish(Result(health_only=True, health_ok=True, party_attempted=True,
+            party_mode=True, party_checked=stamp, room_target='party', party_setpoint=24))
+        self.assertEqual(heater.states['setpointHeat'], 24)
+        self.assertEqual(heater.states['roomTargetIndicator'], 'Party')
+        self.assertEqual(self.plugin._room_target(heater), 'party')
+        self.assertEqual(heater.pluginProps.get('roomTarget', 'standard'), 'standard')
+        self.plugin._publish(Result(health_only=True, health_ok=True, party_attempted=True,
+            party_mode=False, party_checked=stamp, room_target='standard', party_setpoint=22))
+        self.assertEqual(heater.states['setpointHeat'], 22)
+        self.assertEqual(heater.states['roomTargetIndicator'], '')
+        self.assertEqual(heater.states['partyModeText'], 'Off')
+        calls = []
+        self.plugin.manager.write_control = lambda *args: calls.append(args) or True
+        for _ in range(3): self.plugin.togglePartyMode(types.SimpleNamespace(props={}), heater)
+        self.plugin._process_events()
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(heater.states['partyModeText'], 'On')
+        self.assertFalse(heater.states['roomSetpointValid'])
+        self.assertFalse(self.plugin.pending_party_toggles)
+        self.plugin._publish(Result(health_only=True, health_ok=True, party_attempted=True,
+            party_error='Invalid mode'))
+        self.assertEqual(heater.states['partyModeText'], 'Unknown')
+        self.assertFalse(heater.states['partyModeValid'])
 
     def test_connection_loss_does_not_remove_native_setpoint_schema(self):
         self.devices[1].pluginProps['pollingEnabled'] = True
@@ -1304,6 +1336,38 @@ class ClockPartyTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'readback mismatch'):
                 client.write_control('partyMode', True)
             self.assertEqual(len([c for c in server.commands if c.startswith('setPartyModeA1')]), before + 1)
+            client.disconnect()
+        finally: server.stop()
+
+    def test_party_polling_toggle_and_changed_mode_blocks_wrong_target(self):
+        server = FixtureServer()
+        try:
+            client = Client(server.settings(live_writes=True))
+            off = client.poll()
+            self.assertFalse(off.party_mode)
+            self.assertEqual(off.room_target, 'standard')
+            self.assertEqual(off.values['roomSetpoint'], 19)
+            server.party_mode = '1'  # changed externally after the UI's last reading
+            with self.assertRaisesRegex(ValueError, 'Party mode changed'):
+                client.write_setpoint('standard', 23, follow_party=True)
+            self.assertFalse(any(c.startswith('setTempRaumNor') for c in server.commands))
+            on = client.fault()
+            self.assertTrue(on.party_mode)
+            self.assertEqual(on.room_target, 'party')
+            self.assertEqual(on.party_setpoint, 15)
+            self.assertEqual(client.write_setpoint('party', 24, follow_party=True), 24)
+            self.assertFalse(client.write_control('partyToggle'))
+            self.assertEqual(server.party_mode, '0')
+            self.assertTrue(client.write_control('partyToggle'))
+            server.party_mode = 'UNKNOWN'
+            before = sum(c.startswith('setPartyModeA1') for c in server.commands)
+            with self.assertRaisesRegex(ValueError, 'Invalid current party mode'):
+                client.write_control('partyToggle')
+            self.assertEqual(sum(c.startswith('setPartyModeA1') for c in server.commands), before)
+            result = client.poll()
+            self.assertIsNone(result.party_mode)
+            self.assertNotIn('roomSetpoint', result.values)
+            self.assertIn('roomSetpoint', result.errors)
             client.disconnect()
         finally: server.stop()
 

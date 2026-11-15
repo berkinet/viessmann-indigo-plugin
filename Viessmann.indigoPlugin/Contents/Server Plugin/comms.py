@@ -132,6 +132,12 @@ class Result:
     holiday_error: str = ''
     holiday_checked: str = ''
     holiday_attempted: bool = False
+    party_attempted: bool = False
+    party_mode: bool | None = None
+    party_error: str = ''
+    party_checked: str = ''
+    room_target: str = ''
+    party_setpoint: float | None = None
 
 
 def alarm_block(text):
@@ -366,7 +372,29 @@ class Client:
                 result.verified_active_fault_code = code if code and code != '00' else 'Unknown'
         if result.relay_status or result.fault_record:
             result.fault_checked = datetime.now(timezone.utc).isoformat(timespec='seconds')
+        self._read_party(result, cancelled)
         return result
+
+    def _read_party(self, result, cancelled):
+        if not result.live_identity or self.sock is None:
+            return
+        result.party_attempted = True
+        try:
+            raw = self._exchange('getPartyModeA1', cancelled)
+            if raw not in ('0', '1'):
+                raise ValueError('Invalid party mode: ' + raw[:80])
+            result.party_mode = raw == '1'
+            result.party_checked = datetime.now(timezone.utc).isoformat(timespec='seconds')
+            result.room_target = 'party' if result.party_mode else self.settings.target
+            value = temperature(self._exchange(TARGETS[result.room_target][0], cancelled))
+            low = 4 if result.room_target == 'party' else 3
+            if not low <= value <= 37:
+                raise ValueError('Room target outside permitted bounds')
+            result.party_setpoint = value
+        except (OSError, ValueError, UnicodeError) as exc:
+            result.party_error = str(exc)
+            if isinstance(exc, (OSError, UnicodeError)):
+                self.disconnect()
 
     def poll(self, cancelled=lambda: False, on_progress=None):
         result = Result()
@@ -378,8 +406,15 @@ class Client:
                 result.errors[key] = str(exc) if result.tcp_available else (
                     f'Connect to {self.settings.host}:{self.settings.port} failed: {exc}')
             return result
+        self._read_party(result, cancelled)
         reads = dict(READS)
         reads['roomSetpoint'] = TARGETS[self.settings.target][0]
+        if result.party_attempted:
+            reads.pop('roomSetpoint')
+            if result.party_setpoint is not None:
+                result.values['roomSetpoint'] = result.party_setpoint
+            else:
+                result.errors['roomSetpoint'] = result.party_error or 'Party target unavailable'
         if result.simulator or result.live_identity:
             reads['roomMeasuredTemp'] = 'getProbeRoomTemp'
         if result.simulator:
@@ -468,7 +503,7 @@ class Client:
     def write_control(self, kind, value=None, cancelled=lambda: False):
         if kind == 'partyTemperature':
             return self.write_setpoint('party', value, cancelled)
-        if kind not in ('clock', 'partyMode'):
+        if kind not in ('clock', 'partyMode', 'partyToggle'):
             raise ValueError('Unknown controller action')
         if kind == 'partyMode' and type(value) is not bool:
             raise ValueError('Party mode must be explicitly On or Off')
@@ -480,10 +515,12 @@ class Client:
             health = Result()
             if self._ensure_health(health, cancelled) != identity:
                 raise PermissionError('Controller identity changed')
-            if kind == 'partyMode':
+            if kind in ('partyMode', 'partyToggle'):
                 current = self._exchange('getPartyModeA1', cancelled)
                 if current not in ('0', '1'):
                     raise ValueError('Invalid current party mode')
+                if kind == 'partyToggle':
+                    value = current == '0'
                 command = 'setPartyModeA1 %d' % value
             else:
                 current = self._exchange('getSystemTime', cancelled)
@@ -501,7 +538,7 @@ class Client:
             if self._frame(cancelled) != 'OK':
                 raise ValueError('Setter not acknowledged; result uncertain, not retried')
             actual = self._exchange('getSystemTime' if kind == 'clock' else 'getPartyModeA1', cancelled)
-            if kind == 'partyMode':
+            if kind in ('partyMode', 'partyToggle'):
                 if actual != str(int(value)):
                     raise ValueError('Party-mode readback mismatch; not retried')
                 return value
@@ -516,7 +553,7 @@ class Client:
             self.disconnect()
             raise
 
-    def write_setpoint(self, target, value, cancelled=lambda: False):
+    def write_setpoint(self, target, value, cancelled=lambda: False, *, follow_party=False):
         """Fresh endpoint identity, explicit live opt-in, one setter and readback; no retries."""
         if target not in TARGETS:
             raise ValueError('Unknown target')
@@ -535,6 +572,13 @@ class Client:
             checked_identity = self._ensure_health(health, cancelled)
             if checked_identity != identity:
                 raise PermissionError('Controller identity changed before write')
+            if follow_party and identity == LIVE_ID and target != 'dhw':
+                mode = self._exchange('getPartyModeA1', cancelled)
+                if mode not in ('0', '1'):
+                    raise ValueError('Current party mode unavailable; room write cancelled')
+                effective = 'party' if mode == '1' else self.settings.target
+                if target != effective:
+                    raise ValueError('Party mode changed before room write; refresh and retry explicitly')
             read, setter = TARGETS[target]
             current = temperature(self._exchange(read, cancelled))
             if not low <= current <= high:
@@ -625,7 +669,7 @@ class Manager:
             raise PermissionError('Polling must be enabled to use setpoint controls')
         if self.client is None:
             self.client = self.client_factory(self.settings)
-        actual = self.client.write_setpoint(target, value, cancelled)
+        actual = self.client.write_setpoint(target, value, cancelled, follow_party=True)
         return actual
 
     def write_holiday(self, departure, returning, cancelled=lambda: False, *, clear=False):

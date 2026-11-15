@@ -20,6 +20,7 @@ class Plugin(indigo.PluginBase):
         self.established_fault = ''
         self.state_images = {}
         self.burner_inconsistencies = set()
+        self.pending_party_toggles = set()
 
     def closedPrefsConfigUi(self, valuesDict, userCancelled):
         if not userCancelled:
@@ -143,6 +144,11 @@ class Plugin(indigo.PluginBase):
                 str(dev.pluginProps.get('systemId', '')) != str(self.system_id))):
             self.logger.error('Select the active system for clock sync or its heater for party controls')
             return
+        if kind == 'partyToggle':
+            with self.pending_lock:
+                if dev.id in self.pending_party_toggles:
+                    return
+                self.pending_party_toggles.add(dev.id)
         status_key = 'clockActionStatus' if system else 'actionStatus'
         dev.updateStatesOnServer([{'key': status_key, 'value': 'Pending ' + kind + ' confirmation'}])
         self.events.put(('controllerAction', (dev.id, kind, value, self.manager.settings)))
@@ -158,6 +164,9 @@ class Plugin(indigo.PluginBase):
             self._queue_controller_action(dev, 'partyTemperature', value)
         except (ValueError, TypeError) as exc:
             self.logger.error('Party action rejected: %s', exc)
+
+    def togglePartyMode(self, action, dev):
+        self._queue_controller_action(dev, 'partyToggle')
 
     def setPartyMode(self, action, dev):
         mode = action.props.get('mode')
@@ -260,7 +269,7 @@ class Plugin(indigo.PluginBase):
         if kind is None:
             self.logger.error('Unsupported thermostat action')
             return
-        target = dev.pluginProps.get('roomTarget', 'standard') if dev.deviceTypeId == 'viessmannHeater' else 'dhw'
+        target = self._room_target(dev) if dev.deviceTypeId == 'viessmannHeater' else 'dhw'
         self._begin_set(dev)
         self.events.put(('write', (dev.id, target, kind, action.actionValue, self.manager.settings)))
 
@@ -277,10 +286,12 @@ class Plugin(indigo.PluginBase):
         try:
             if original_settings is None or original_settings != self.manager.settings:
                 raise ValueError('Configuration changed before action; retry explicitly')
-            current_target = dev.pluginProps.get('roomTarget', 'standard') if dev.deviceTypeId == 'viessmannHeater' else 'dhw'
+            current_target = self._room_target(dev) if dev.deviceTypeId == 'viessmannHeater' else 'dhw'
             if current_target != target or str(dev.pluginProps.get('systemId', '')) != str(self.system_id):
                 raise ValueError('Selected target or parent changed before action')
             simulated = dev.states.get('simulator', False)
+            if (dev.deviceTypeId == 'viessmannHeater' and dev.states.get('roomSetpointValid') is False):
+                raise ValueError('Room target is awaiting confirmed polling')
             if not dev.states.get('dataValid', False):
                 raise ValueError('A valid current reading is required before editing')
             if not simulated and (not self._live_writes_enabled() or target not in ('standard', 'dhw', 'party')):
@@ -353,6 +364,8 @@ class Plugin(indigo.PluginBase):
         self.unavailable[dev.id] = reason
         updates = [{'key': 'dataValid', 'value': False}, {'key': 'status', 'value': reason}]
         updates.extend({'key': key + 'Valid', 'value': False} for key in self._keys(dev))
+        if dev.deviceTypeId == 'viessmannHeater':
+            updates.extend([{'key': 'partyModeValid', 'value': False}, {'key': 'partyModeText', 'value': 'Unknown'}])
         if dev.deviceTypeId == 'viessmannSystem':
             updates.extend([{'key': 'holidayValid', 'value': False},
                             {'key': 'holidayStatus', 'value': 'Unknown'},
@@ -483,7 +496,50 @@ class Plugin(indigo.PluginBase):
             self._publish(result, device_ids=ready, provisional=True)
             published.update(ready)
 
+    @staticmethod
+    def _room_target(dev):
+        if dev.states.get('partyModeValid') and dev.states.get('partyMode'):
+            return 'party'
+        return dev.pluginProps.get('roomTarget', 'standard')
+
+    @staticmethod
+    def _party_mode_updates(value, stamp):
+        return [{'key': 'partyMode', 'value': value},
+                {'key': 'partyModeValid', 'value': True},
+                {'key': 'partyModeText', 'value': 'On' if value else 'Off'},
+                {'key': 'partyModeUpdated', 'value': stamp},
+                {'key': 'partyModeError', 'value': ''}]
+
+    def _publish_party(self, result):
+        failed = not result.health_ok and not result.values
+        if not result.party_attempted and not failed:
+            return
+        for ident in self.active:
+            dev = self._device(ident)
+            if (dev is None or dev.deviceTypeId != 'viessmannHeater'
+                    or str(dev.pluginProps.get('systemId', '')) != str(self.system_id)):
+                continue
+            if result.party_mode is None:
+                updates = [{'key': 'partyModeValid', 'value': False},
+                           {'key': 'roomSetpointValid', 'value': False},
+                           {'key': 'roomTargetIndicator', 'value': ''},
+                           {'key': 'partyModeText', 'value': 'Unknown'},
+                           {'key': 'partyModeError', 'value': result.party_error or result.health_error or 'Controller unavailable'}]
+            else:
+                updates = self._party_mode_updates(result.party_mode, result.party_checked)
+                updates.append({'key': 'roomSetpointValid', 'value': result.party_setpoint is not None})
+                if result.party_setpoint is not None:
+                    updates.extend([{'key': 'roomSetpoint', 'value': result.party_setpoint},
+                                    {'key': 'roomSetpointUpdated', 'value': result.party_checked},
+                                    {'key': 'selectedTarget', 'value': result.room_target.title()},
+                                    {'key': 'roomTargetIndicator', 'value': 'Party' if result.room_target == 'party' else ''}])
+                    if dev.pluginProps.get('SupportsHeatSetpoint'):
+                        updates.extend(self._native_setpoint_updates(dev, result.party_setpoint))
+            dev.updateStatesOnServer(updates)
+
     def _publish(self, result, device_ids=None, provisional=False):
+        if not provisional:
+            self._publish_party(result)
         if result.health_only:
             self._publish_health(result)
             return
@@ -547,7 +603,7 @@ class Plugin(indigo.PluginBase):
             elif dev.deviceTypeId == 'viessmannSystem':
                 updates.extend(self._clock_success_updates(dev, result))
             if dev.deviceTypeId != 'viessmannSystem':
-                target = dev.pluginProps.get('roomTarget', 'standard')
+                target = result.room_target or self._room_target(dev)
                 target_key = 'roomSetpoint' if dev.deviceTypeId == 'viessmannHeater' else 'dhwSetpoint'
                 live_allowed = (self._live_writes_enabled() and result.live_identity and result.health_ok
                                 and (target in ('standard', 'party') or dev.deviceTypeId == 'viessmannWaterHeater'))
@@ -623,15 +679,26 @@ class Plugin(indigo.PluginBase):
                     elif str(dev.pluginProps.get('systemId', '')) != str(self.system_id):
                         raise ValueError('Parent system changed')
                     actual = self.manager.write_control(kind, value, self.closing.is_set)
-                    state = {'clock': 'controllerTime', 'partyMode': 'partyMode',
+                    state = {'clock': 'controllerTime', 'partyMode': 'partyMode', 'partyToggle': 'partyMode',
                              'partyTemperature': 'partyTemperature'}[kind]
-                    dev.updateStatesOnServer([{'key': state, 'value': actual},
-                        {'key': key, 'value': kind + ' readback confirmed'}])
+                    mode_updates = (self._party_mode_updates(actual, datetime.now(timezone.utc).isoformat(timespec='seconds'))
+                                    if kind in ('partyMode', 'partyToggle') else [{'key': state, 'value': actual}])
+                    if kind in ('partyMode', 'partyToggle'):
+                        mode_updates.append({'key': 'roomSetpointValid', 'value': False})
+                    dev.updateStatesOnServer(mode_updates + [{'key': key, 'value': kind + ' readback confirmed'}])
                     self.logger.info('%s: %s readback confirmed: %s', dev.name, kind, actual)
                 except (OSError, ValueError, KeyError, TypeError) as exc:
-                    dev.updateStatesOnServer([{'key': key, 'value': str(exc)}])
+                    updates = [{'key': key, 'value': str(exc)}]
+                    if kind in ('partyMode', 'partyToggle'):
+                        updates.extend([{'key': 'partyModeValid', 'value': False},
+                                        {'key': 'partyModeText', 'value': 'Unknown'},
+                                        {'key': 'partyModeError', 'value': str(exc)},
+                                        {'key': 'roomSetpointValid', 'value': False}])
+                    dev.updateStatesOnServer(updates)
                     self.logger.error('Controller action rejected/failed: %s', exc)
                 finally:
+                    with self.pending_lock:
+                        self.pending_party_toggles.discard(ident)
                     self.manager.request_poll()
                 continue
             if action in ('holiday', 'clearHoliday'):

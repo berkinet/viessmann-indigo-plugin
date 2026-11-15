@@ -198,12 +198,17 @@
         </List>
       </Field>
       <Field id="thermostatHelp" type="label">
-        <Label>Live standard-room setpoint controls require opt-in in plugin configuration. Reduced and party writes remain simulator-only. Selecting a target does not activate party mode or change the boiler program.</Label>
+        <Label>Live standard and party targets require write opt-in. Reduced writes remain simulator-only. When party mode is confirmed On, the thermostat follows the party target; otherwise it uses the selection above. Selecting a target does not activate party mode.</Label>
       </Field>
       <Field id="SupportsStatusRequest" type="checkbox" defaultValue="true" hidden="true" />
     </ConfigUI>
     <States>
-      <State id="partyMode"><ValueType>Boolean</ValueType><TriggerLabel>Party mode last action readback</TriggerLabel><ControlPageLabel>Party mode last action readback</ControlPageLabel></State>
+      <State id="partyMode"><ValueType>Boolean</ValueType><TriggerLabel>Party mode</TriggerLabel><ControlPageLabel>Party mode</ControlPageLabel></State>
+      <State id="roomTargetIndicator"><ValueType>String</ValueType><TriggerLabel>Room target indicator</TriggerLabel><ControlPageLabel>Room target indicator</ControlPageLabel></State>
+      <State id="partyModeText"><ValueType>String</ValueType><TriggerLabel>Party mode display</TriggerLabel><ControlPageLabel>Party mode display</ControlPageLabel></State>
+      <State id="partyModeValid"><ValueType>Boolean</ValueType><TriggerLabel>Party mode reading valid</TriggerLabel><ControlPageLabel>Party mode reading valid</ControlPageLabel></State>
+      <State id="partyModeUpdated"><ValueType>String</ValueType><TriggerLabel>Party mode last success (UTC)</TriggerLabel><ControlPageLabel>Party mode last success (UTC)</ControlPageLabel></State>
+      <State id="partyModeError"><ValueType>String</ValueType><TriggerLabel>Party mode reading error</TriggerLabel><ControlPageLabel>Party mode reading error</ControlPageLabel></State>
       <State id="partyTemperature"><ValueType>Number</ValueType><TriggerLabel>Party temperature last action readback</TriggerLabel><ControlPageLabel>Party temperature last action readback</ControlPageLabel></State>
 
       <State id="roomMeasuredTemp"><ValueType>Number</ValueType><TriggerLabel>Measured room temperature (C)</TriggerLabel><ControlPageLabel>Measured room temperature (C)</ControlPageLabel></State>
