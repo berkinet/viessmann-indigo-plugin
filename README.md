@@ -55,3 +55,7 @@ Dedicated Clear holiday dates action writes both 1970-01-01 reset dates and conf
 ## Version 0.2.22
 
 The optional holiday control-page date variables follow confirmed heater date changes and successful Set/Clear readback. Unchanged polls preserve edits. External date changes replace edits with reported dates. Clear was live-tested successfully by the owner.
+
+## Version 0.2.23
+
+Adds decoded alarmBlock and raw alarmBlockRaw system states, sampled on the fault-check interval. Includes all 29 bytes and catalogue-defined timestamp, flags, participant and fault code. Diagnostic only; see docs/alarm-block.md.

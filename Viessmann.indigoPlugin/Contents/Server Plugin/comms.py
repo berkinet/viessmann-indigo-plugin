@@ -111,6 +111,8 @@ class Result:
     health_checked: str = ''
     health_only: bool = False
     fault_only: bool = False
+    alarm: str = ''
+    alarm_raw: str = ''
     fault_record: str = ''
     relay_status: str = ''
     fault_checked: str = ''
@@ -130,6 +132,26 @@ class Result:
     holiday_error: str = ''
     holiday_checked: str = ''
     holiday_attempted: bool = False
+
+
+def alarm_block(text):
+    """KO2B catalogue A132/29. Preserve every byte; no active-fault inference."""
+    if not re.fullmatch(r'[0-9A-Fa-f]{2}(?: [0-9A-Fa-f]{2}){28}', text):
+        raise ValueError('Expected exactly 29 alarm bytes')
+    b = bytes.fromhex(text)
+    if b in (b'\x05' * 29, b'\xff' * 29):
+        raise ValueError('Unavailable or synchronization-only alarm block')
+    year = int.from_bytes(b[16:18], 'little')
+    parts = (year, *b[18:23])
+    try:
+        timestamp = datetime(*parts).isoformat() if any(parts) else 'Unavailable'
+    except ValueError:
+        timestamp = 'Invalid controller timestamp ' + str(parts)
+    return ('Controller time=%s (heater local); faultCode=%02X; faultyParticipant=%d; '
+            'participant=%d; systemNumber=%d; faultManager=%s; changeFlag=%s; '
+            'bytes[0..28]=%s' % (timestamp, b[28], b[27], b[15], b[14] & 15,
+            bool(b[14] & 32), bool(b[14] & 16),
+            ','.join('%d:%02X' % (i, v) for i, v in enumerate(b))))
 
 
 class Client:
@@ -174,7 +196,7 @@ class Client:
         return frame.decode('ascii').strip()
 
     def _exchange(self, command, cancelled):
-        allowed = HOLIDAY_READS | set(READS.values()) | {v[0] for v in TARGETS.values()} | {'getProbeRoomTemp', 'getSystemTime', 'getError0', 'getProbeRelayStatus', 'getProbeProductionStatus', 'getProbeBurner1', 'getProbeOutputStatus', 'device', 'close'}
+        allowed = HOLIDAY_READS | set(READS.values()) | {v[0] for v in TARGETS.values()} | {'getProbeAlarmBlockRaw', 'getProbeRoomTemp', 'getSystemTime', 'getError0', 'getProbeRelayStatus', 'getProbeProductionStatus', 'getProbeBurner1', 'getProbeOutputStatus', 'device', 'close'}
         if command not in allowed:
             raise ValueError('Command is not an allowed read or link release')
         self.sock.settimeout(self.settings.timeout)
@@ -272,7 +294,7 @@ class Client:
             self.disconnect()
             return result
         errors = []
-        for command, attribute in [('getError0', 'fault_record'), ('getProbeRelayStatus', 'relay_status'), ('getProbeProductionStatus', 'production_status'), ('getProbeBurner1', 'burner_status'), ('getProbeOutputStatus', 'burner_output')]:
+        for command, attribute in [('getError0', 'fault_record'), ('getProbeRelayStatus', 'relay_status'), ('getProbeProductionStatus', 'production_status'), ('getProbeBurner1', 'burner_status'), ('getProbeOutputStatus', 'burner_output'), ('getProbeAlarmBlockRaw', 'alarm')]:
             try:
                 text = self._exchange(command, cancelled)
             except (OSError, ValueError, UnicodeError) as exc:
@@ -280,13 +302,17 @@ class Client:
                 self.disconnect()
                 break
             try:
+                if attribute == 'alarm':
+                    result.alarm_raw = text
                 if attribute == 'burner_output':
                     result.burner_output_raw = text
                 elif attribute == 'production_status':
                     result.production_status_raw = text
                 if not text or 'ERR' in text or 'UNKNOWN' in text or 'Error executing' in text:
                     raise ValueError('Fault sampling failed: ' + text[:160])
-                if attribute == 'relay_status':
+                if attribute == 'alarm':
+                    text = alarm_block(text)
+                elif attribute == 'relay_status':
                     if not re.fullmatch(r'[0-9A-Fa-f]{2} [0-9A-Fa-f]{2}', text):
                         raise ValueError('Invalid relay status: ' + text[:160])
                     if bytes.fromhex(text) == b'\x05\x05':

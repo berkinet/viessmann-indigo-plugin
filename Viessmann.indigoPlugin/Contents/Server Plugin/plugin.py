@@ -305,6 +305,7 @@ class Plugin(indigo.PluginBase):
             updates.extend([{'key': 'holidayValid', 'value': False},
                             {'key': 'holidayStatus', 'value': 'Unknown'},
                             {'key': 'productionStatusValid', 'value': False},
+                            {'key': 'alarmBlock', 'value': 'Unavailable: ' + reason},
                             {'key': 'burnerOutputValid', 'value': False},
                             {'key': 'burnerStatusValid', 'value': False},
                             {'key': 'tcpAvailable', 'value': False},
@@ -370,10 +371,13 @@ class Plugin(indigo.PluginBase):
                             {'key': 'opticalActivityDetected', 'value': result.optical_activity == 'Detected'},
                             {'key': 'opticalActivityError', 'value': result.optical_error}])
         if not result.health_ok:
+            updates.append({'key': 'alarmBlock', 'value': 'Unavailable: controller health check failed'})
             updates.extend([{'key': 'burnerStatusValid', 'value': False},
                             {'key': 'burnerOutputValid', 'value': False},
                             {'key': 'productionStatusValid', 'value': False}])
         if result.fault_only:
+            updates.extend([{'key': 'alarmBlock', 'value': result.alarm or 'Unavailable: ' + (result.fault_error or 'alarm read not completed')},
+                            {'key': 'alarmBlockRaw', 'value': result.alarm_raw}])
             updates.extend([{'key': 'productionStatusValid', 'value': result.production_status is not None},
                             {'key': 'productionStatusError', 'value': result.production_status_error}])
             if result.production_status_raw:

@@ -74,6 +74,8 @@
       <State id="burnerStatusUpdated"><ValueType>String</ValueType><TriggerLabel>Burner activity last success (UTC)</TriggerLabel><ControlPageLabel>Burner activity last success (UTC)</ControlPageLabel></State>
 
       <State id="lastRecordedError"><ValueType>String</ValueType><TriggerLabel>Last recorded error (history)</TriggerLabel><ControlPageLabel>Last recorded error (history)</ControlPageLabel></State>
+      <State id="alarmBlock"><ValueType>String</ValueType><TriggerLabel>Alarm block decoded (29 bytes)</TriggerLabel><ControlPageLabel>Alarm block decoded</ControlPageLabel></State>
+      <State id="alarmBlockRaw"><ValueType>String</ValueType><TriggerLabel>Alarm block raw (29 bytes)</TriggerLabel><ControlPageLabel>Alarm block raw</ControlPageLabel></State>
       <State id="relayStatusRaw"><ValueType>String</ValueType><TriggerLabel>Raw relay status</TriggerLabel><ControlPageLabel>Raw relay status</ControlPageLabel></State>
       <State id="lastFaultCheck"><ValueType>String</ValueType><TriggerLabel>Last fault sample (UTC)</TriggerLabel><ControlPageLabel>Last fault sample (UTC)</ControlPageLabel></State>
       <State id="faultStatus"><ValueType>String</ValueType><TriggerLabel>Current fault interpretation</TriggerLabel><ControlPageLabel>Current fault interpretation</ControlPageLabel></State>

@@ -1,0 +1,14 @@
+diff --git a/src/io.c b/src/io.c
+index 29e698b..b33e97d 100644
+--- a/src/io.c
++++ b/src/io.c
+@@ -228,7 +228,8 @@ int receive_nb(int fd, char *r_buf, int r_len, unsigned long *etime)
+ {
+     int i;
+     ssize_t len;
+-    char string[100];
++    // Hex dump needs three characters per received byte plus its label.
++    char string[3 * MAXBUF + 32];
+ 
+     fd_set rfds;
+     struct timeval tv;

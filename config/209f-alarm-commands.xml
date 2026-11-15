@@ -1,0 +1,4 @@
+<command name="getProbeAlarmBlockRaw" protocmd="getaddr">
+  <description>KO2B full alarm block; raw diagnostic read</description>
+  <device ID="209F"><addr>A132</addr><len>29</len></device>
+</command>

@@ -10,7 +10,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'Viessmann.indigoPlugin/Contents/Server Plugin'))
-from comms import Client, Manager, Settings, Result, READS, temperature, holiday_state
+from comms import Client, Manager, Settings, Result, READS, temperature, holiday_state, alarm_block
 
 
 def readings(*values):
@@ -80,6 +80,8 @@ class FixtureServer(socketserver.ThreadingTCPServer):
                             reply = owner.setter_reply + '\nvctrld> '
                         elif command == 'getProbeOutputStatus':
                             reply = owner.output_reply + '\nvctrld> '
+                        elif command == 'getProbeAlarmBlockRaw':
+                            reply = '00 00 00 00 00 00 00 00 00 00 00 00 19 17 21 01 EA 07 0B 0F 0D 06 30 00 00 00 00 00 00\nvctrld> '
                         elif command == 'getProbeProductionStatus':
                             reply = owner.production_reply + '\nvctrld> '
                         elif command == 'getProbeBurner1':
@@ -732,6 +734,19 @@ class AdapterTests(unittest.TestCase):
             del stub.variables
             del stub.variable
 
+    def test_alarm_summary_and_raw_publish_and_failed_sample_is_unavailable(self):
+        self.devices[1].pluginProps['pollingEnabled'] = True
+        self.plugin._configure()
+        system = self.devices[1]
+        self.plugin._publish(Result(health_only=True, health_ok=True, tcp_available=True, fault_only=True,
+            alarm='decoded fields', alarm_raw='00 ' * 28 + '00'))
+        self.assertEqual(system.states['alarmBlock'], 'decoded fields')
+        self.assertEqual(len(system.states['alarmBlockRaw'].split()), 29)
+        self.plugin._publish(Result(health_only=True, health_ok=True, tcp_available=True, fault_only=True,
+            alarm_raw='FF', fault_error='Expected exactly 29 alarm bytes'))
+        self.assertTrue(system.states['alarmBlock'].startswith('Unavailable:'))
+        self.assertEqual(system.states['alarmBlockRaw'], 'FF')
+
     def test_holiday_publish_and_failed_read_keep_dates_but_mark_unknown(self):
         system = self.devices[1]
         actual = holiday_state('2090-11-20T00:00:00+0000', '2090-12-13T00:00:00+0000', '02')
@@ -1188,3 +1203,16 @@ class HolidayReadbackTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class AlarmDecodeTests(unittest.TestCase):
+    def test_catalog_layout_and_unknown_bytes_preserved(self):
+        raw = '00 00 00 00 00 00 00 00 00 00 00 00 19 17 21 01 EA 07 0B 0F 0D 06 30 00 00 00 00 02 D1'
+        decoded = alarm_block(raw)
+        self.assertIn('2026-11-15T13:06:48', decoded)
+        self.assertIn('faultCode=D1', decoded)
+        self.assertIn('faultyParticipant=2', decoded)
+        self.assertIn('faultManager=True', decoded)
+        self.assertIn('12:19,13:17', decoded)
+        for invalid in ('00', ' '.join(['05']*29), ' '.join(['FF']*29)):
+            with self.assertRaises(ValueError): alarm_block(invalid)
