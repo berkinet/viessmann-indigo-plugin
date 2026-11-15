@@ -88,3 +88,25 @@ activating it. Unknown target/mode does not become Off or a valid target.
 Owner confirmed live clock synchronization and party-mode actions successful after
 0.2.24 installation. The new transitions/toggle routing were fixture-tested; no
 physical mode changes were performed while developing 0.2.25.
+
+## Version 0.2.28 — Apply feedback and immediate display
+
+An Apply of 24 C was confirmed in the live log at 16:36:34 on 15 November; the
+main thermostat displayed24 after the subsequent full poll. Apply was working,
+but its dedicated action only published partyTemperature immediately. It now
+publishes the main native/custom setpoint too when the heater is displaying the
+party target, after ACK/readback only, without waiting for another full cycle.
+
+The optional control-page variable vitoPartyTemperatureNote is maintained by
+the plugin when present. A changed vitoPartyTemperatureDraft sets the note to
+Unset. Apply sets Setting…; matching confirmed controller readback clears it.
+Failure leaves Unset and the existing actionStatus carries the error. A newer
+draft different from an older confirmed request keeps Unset. Unset refers to
+the edited request, not absence of an existing controller target.
+
+The plugin subscribes to variable changes for prompt feedback. Party-temperature
+readback is now polled even with party mode Off; partyTemperature tracks that
+readback, while roomSetpoint follows the effective editing target as before.
+A valid readback matching the draft can clear the note without another write.
+The draft itself is not overwritten by periodic reads. All writes retain the
+existing authorization, identity, bounds, ACK/readback and no-retry safeguards.

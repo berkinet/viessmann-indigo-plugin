@@ -667,6 +667,43 @@ class AdapterTests(unittest.TestCase):
         self.plugin._update_state_icon(dev)
         self.assertEqual(dev.icon, 'fault')
 
+    def test_party_apply_updates_display_and_draft_note_after_readback(self):
+        stub = sys.modules['indigo']
+        draft = types.SimpleNamespace(id=21, value='24', name='vitoPartyTemperatureDraft')
+        note = types.SimpleNamespace(id=22, value='')
+        stub.variables = {'vitoPartyTemperatureDraft': draft, 'vitoPartyTemperatureNote': note}
+        stub.variable = types.SimpleNamespace(updateValue=lambda ident, value: setattr(note, 'value', value))
+        try:
+            self.devices[1].pluginProps['pollingEnabled'] = True
+            self.plugin._configure()
+            heater = self.devices[2]
+            heater.states.update(partyMode=True, partyModeValid=True, setpointHeat=15)
+            self.plugin.variableUpdated(types.SimpleNamespace(value='15'), draft)
+            self.assertEqual(note.value, 'Unset')
+            self.plugin.manager.write_control = lambda *args: 24
+            self.plugin.setPartyTemperature(types.SimpleNamespace(props={'temperature': '24'}), heater)
+            self.assertEqual(note.value, 'Setting…')
+            self.plugin._process_events()
+            self.assertEqual(note.value, '')
+            self.assertEqual(heater.states['setpointHeat'], 24)
+            self.assertEqual(heater.states['roomSetpoint'], 24)
+            self.assertEqual(heater.states['partyTemperature'], 24)
+            draft.value = '25'
+            self.plugin.variableUpdated(types.SimpleNamespace(value='24'), draft)
+            self.plugin._sync_party_note(24)  # earlier request must not clear a new draft
+            self.assertEqual(note.value, 'Unset')
+            self.plugin._sync_party_note(25)
+            self.assertEqual(note.value, '')
+            def fail(*args): raise ValueError('Readback failed')
+            self.plugin.manager.write_control = fail
+            self.plugin.setPartyTemperature(types.SimpleNamespace(props={'temperature': '26'}), heater)
+            self.plugin._process_events()
+            self.assertEqual(note.value, 'Unset')
+            self.assertEqual(heater.states['setpointHeat'], 24)
+        finally:
+            del stub.variables
+            del stub.variable
+
     def test_alarm_content_failure_does_not_generate_false_content_change(self):
         dev = self.devices[1]
         self.plugin._publish(Result(health_only=True, fault_only=True, health_ok=True,
@@ -1443,6 +1480,7 @@ class ClockPartyTests(unittest.TestCase):
             off = client.poll()
             self.assertFalse(off.party_mode)
             self.assertEqual(off.room_target, 'standard')
+            self.assertEqual(off.party_temperature, 15)
             self.assertEqual(off.values['roomSetpoint'], 19)
             server.party_mode = '1'  # changed externally after the UI's last reading
             with self.assertRaisesRegex(ValueError, 'Party mode changed'):

@@ -91,3 +91,10 @@ Adds **Alarm block contents (excluding time)** (`alarmBlockContent`). Trigger on
 any change in that state and log the full `alarmBlock`; timestamp-only updates
 no longer cause log entries. Invalid reads retain content with validity false.
 See [alarm logging](docs/alarm-block.md#timestamp-independent-change-trigger--0227).
+
+## Version 0.2.28
+
+Confirmed party-temperature Apply immediately updates the main party setpoint.
+The optional dashboard note shows Unset for an edited/unconfirmed request,
+Setting… while applying, and clears on matching readback. Periodic reads now
+track the party target even when mode is Off. See docs/clock-party-actions.md.

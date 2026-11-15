@@ -140,6 +140,7 @@ class Result:
     party_checked: str = ''
     room_target: str = ''
     party_setpoint: float | None = None
+    party_temperature: float | None = None
 
 
 def alarm_block(text):
@@ -392,7 +393,11 @@ class Client:
             result.party_mode = raw == '1'
             result.party_checked = datetime.now(timezone.utc).isoformat(timespec='seconds')
             result.room_target = 'party' if result.party_mode else self.settings.target
-            value = temperature(self._exchange(TARGETS[result.room_target][0], cancelled))
+            party = temperature(self._exchange('getTempPartyM1', cancelled))
+            if not 4 <= party <= 37:
+                raise ValueError('Party target outside permitted bounds')
+            result.party_temperature = party
+            value = party if result.room_target == 'party' else temperature(self._exchange(TARGETS[result.room_target][0], cancelled))
             low = 4 if result.room_target == 'party' else 3
             if not low <= value <= 37:
                 raise ValueError('Room target outside permitted bounds')

@@ -215,7 +215,7 @@
       <State id="partyModeValid"><ValueType>Boolean</ValueType><TriggerLabel>Party mode reading valid</TriggerLabel><ControlPageLabel>Party mode reading valid</ControlPageLabel></State>
       <State id="partyModeUpdated"><ValueType>String</ValueType><TriggerLabel>Party mode last success (UTC)</TriggerLabel><ControlPageLabel>Party mode last success (UTC)</ControlPageLabel></State>
       <State id="partyModeError"><ValueType>String</ValueType><TriggerLabel>Party mode reading error</TriggerLabel><ControlPageLabel>Party mode reading error</ControlPageLabel></State>
-      <State id="partyTemperature"><ValueType>Number</ValueType><TriggerLabel>Party temperature last action readback</TriggerLabel><ControlPageLabel>Party temperature last action readback</ControlPageLabel></State>
+      <State id="partyTemperature"><ValueType>Number</ValueType><TriggerLabel>Party temperature (controller readback)</TriggerLabel><ControlPageLabel>Party temperature (controller readback)</ControlPageLabel></State>
 
       <State id="roomMeasuredTemp"><ValueType>Number</ValueType><TriggerLabel>Measured room temperature (C)</TriggerLabel><ControlPageLabel>Measured room temperature (C)</ControlPageLabel></State>
       <State id="roomMeasuredTempValid"><ValueType>Boolean</ValueType><TriggerLabel>Measured room temperature valid</TriggerLabel><ControlPageLabel>Measured room temperature valid</ControlPageLabel></State>

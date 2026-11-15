@@ -22,6 +22,29 @@ class Plugin(indigo.PluginBase):
         self.burner_inconsistencies = set()
         self.pending_party_toggles = set()
 
+    def startup(self):
+        indigo.variables.subscribeToChanges()
+
+    def variableUpdated(self, oldVar, newVar):
+        if newVar.name == 'vitoPartyTemperatureDraft' and oldVar.value != newVar.value:
+            self._set_party_note('Unset')
+
+    @staticmethod
+    def _set_party_note(value):
+        try:
+            variable = indigo.variables['vitoPartyTemperatureNote']
+            if variable.value != value:
+                indigo.variable.updateValue(variable.id, value)
+        except (KeyError, AttributeError):
+            pass  # Optional dashboard variables are not a plugin requirement.
+
+    def _sync_party_note(self, actual):
+        try:
+            draft = float(indigo.variables['vitoPartyTemperatureDraft'].value.strip())
+            self._set_party_note('' if draft == actual else 'Unset')
+        except (KeyError, AttributeError, ValueError, TypeError):
+            self._set_party_note('Unset')
+
     def closedPrefsConfigUi(self, valuesDict, userCancelled):
         if not userCancelled:
             self.pluginPrefs.update(valuesDict)
@@ -167,6 +190,8 @@ class Plugin(indigo.PluginBase):
                 if dev.id in self.pending_party_toggles:
                     return
                 self.pending_party_toggles.add(dev.id)
+        if kind == 'partyTemperature':
+            self._set_party_note('Setting…')
         status_key = 'clockActionStatus' if system else 'actionStatus'
         dev.updateStatesOnServer([{'key': status_key, 'value': 'Pending ' + kind + ' confirmation'}])
         self.events.put(('controllerAction', (dev.id, kind, value, self.manager.settings)))
@@ -567,6 +592,9 @@ class Plugin(indigo.PluginBase):
                                     {'key': 'roomTargetIndicator', 'value': 'Party' if result.room_target == 'party' else ''}])
                     if dev.pluginProps.get('SupportsHeatSetpoint'):
                         updates.extend(self._native_setpoint_updates(dev, result.party_setpoint))
+            if result.party_temperature is not None:
+                updates.append({'key': 'partyTemperature', 'value': result.party_temperature})
+                self._sync_party_note(result.party_temperature)
             dev.updateStatesOnServer(updates)
 
     def _publish(self, result, device_ids=None, provisional=False):
@@ -710,17 +738,29 @@ class Plugin(indigo.PluginBase):
                             raise ValueError('Active system changed')
                     elif str(dev.pluginProps.get('systemId', '')) != str(self.system_id):
                         raise ValueError('Parent system changed')
+                    if kind == 'partyTemperature':
+                        self._set_party_note('Setting…')
                     actual = self.manager.write_control(kind, value, self.closing.is_set)
                     state = {'clock': 'controllerTime', 'partyMode': 'partyMode', 'partyToggle': 'partyMode',
                              'partyTemperature': 'partyTemperature'}[kind]
                     mode_updates = (self._party_mode_updates(actual, datetime.now(timezone.utc).isoformat(timespec='seconds'))
                                     if kind in ('partyMode', 'partyToggle') else [{'key': state, 'value': actual}])
+                    if kind == 'partyTemperature':
+                        self._sync_party_note(actual)
+                        if self._room_target(dev) == 'party':
+                            mode_updates.extend(self._native_setpoint_updates(dev, actual) + [
+                                {'key': 'roomSetpoint', 'value': actual},
+                                {'key': 'roomSetpointValid', 'value': True},
+                                {'key': 'roomSetpointUpdated', 'value': datetime.now(timezone.utc).isoformat(timespec='seconds')},
+                                {'key': 'roomTargetIndicator', 'value': 'Party'}])
                     if kind in ('partyMode', 'partyToggle'):
                         mode_updates.append({'key': 'roomSetpointValid', 'value': False})
                     dev.updateStatesOnServer(mode_updates + [{'key': key, 'value': kind + ' readback confirmed'}])
                     self.logger.info('%s: %s readback confirmed: %s', dev.name, kind, actual)
                 except (OSError, ValueError, KeyError, TypeError) as exc:
                     updates = [{'key': key, 'value': str(exc)}]
+                    if kind == 'partyTemperature':
+                        self._set_party_note('Unset')
                     if kind in ('partyMode', 'partyToggle'):
                         updates.extend([{'key': 'partyModeValid', 'value': False},
                                         {'key': 'partyModeText', 'value': 'Unknown'},
