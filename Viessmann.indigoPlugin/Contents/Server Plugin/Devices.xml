@@ -77,6 +77,8 @@
       <State id="clockActionStatus"><ValueType>String</ValueType><TriggerLabel>Clock action result</TriggerLabel><ControlPageLabel>Clock action result</ControlPageLabel></State>
       <State id="burnerOn"><ValueType>Boolean</ValueType><TriggerLabel>Burner on (fault gated)</TriggerLabel><ControlPageLabel>Burner on (fault gated)</ControlPageLabel></State>
       <State id="burnerOnValid"><ValueType>Boolean</ValueType><TriggerLabel>Burner on state valid</TriggerLabel><ControlPageLabel>Burner on state valid</ControlPageLabel></State>
+      <State id="alarmBlockContent"><ValueType>String</ValueType><TriggerLabel>Alarm block contents (excluding time)</TriggerLabel><ControlPageLabel>Alarm block contents (excluding time)</ControlPageLabel></State>
+      <State id="alarmBlockContentValid"><ValueType>Boolean</ValueType><TriggerLabel>Alarm block contents valid</TriggerLabel><ControlPageLabel>Alarm block contents valid</ControlPageLabel></State>
       <State id="alarmChangeFlag"><ValueType>Boolean</ValueType><TriggerLabel>Alarm change flag</TriggerLabel><ControlPageLabel>Alarm change flag</ControlPageLabel></State>
       <State id="alarmChangeFlagValid"><ValueType>Boolean</ValueType><TriggerLabel>Alarm change flag valid</TriggerLabel><ControlPageLabel>Alarm change flag valid</ControlPageLabel></State>
       <State id="alarmBlock"><ValueType>String</ValueType><TriggerLabel>Alarm block decoded (29 bytes)</TriggerLabel><ControlPageLabel>Alarm block decoded</ControlPageLabel></State>

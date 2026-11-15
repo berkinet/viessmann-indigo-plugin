@@ -102,3 +102,10 @@ Off; otherwise preserve the existing burnerOutput algorithm. Do not require a
 new valid production-status read before applying the previous output logic.
 Keep raw burner readings intact and expose a separate validated alarmChangeFlag
 Boolean. Control-page work remains explicitly paused pending owner resumption.
+
+After the owner-cleared D1, alarmChangeFlag remained false in sampled reads even
+though the alarm code cleared. Owner approved alarmBlockContent as a stable
+change-trigger state excluding only clock bytes16–22. Include all other bytes,
+retain on failure with validity false, and leave full alarmBlock available for
+the logging action. Do not treat the controller changeFlag as guaranteed event
+delivery or infer that an unobserved pulse never occurred.

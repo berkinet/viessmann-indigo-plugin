@@ -667,6 +667,22 @@ class AdapterTests(unittest.TestCase):
         self.plugin._update_state_icon(dev)
         self.assertEqual(dev.icon, 'fault')
 
+    def test_alarm_content_failure_does_not_generate_false_content_change(self):
+        dev = self.devices[1]
+        self.plugin._publish(Result(health_only=True, fault_only=True, health_ok=True,
+                                    alarm='first full block', alarm_content='0:00,28:D1'))
+        self.assertEqual(dev.states['alarmBlockContent'], '0:00,28:D1')
+        self.assertTrue(dev.states['alarmBlockContentValid'])
+        self.plugin._publish(Result(health_only=True, fault_only=True, health_ok=True,
+                                    fault_error='Unavailable alarm'))
+        self.assertEqual(dev.states['alarmBlockContent'], '0:00,28:D1')
+        self.assertFalse(dev.states['alarmBlockContentValid'])
+        self.plugin._publish(Result(health_only=True, fault_only=True, health_ok=True,
+                                    alarm='cleared full block', alarm_content='0:00,28:00'))
+        self.assertEqual(dev.states['alarmBlockContent'], '0:00,28:00')
+        self.assertEqual(dev.states['alarmBlock'], 'cleared full block')
+        self.assertTrue(dev.states['alarmBlockContentValid'])
+
     def test_production_fault_gates_burner_and_alarm_flag_is_independent(self):
         dev = self.devices[1]
         def sample(fault, output=100, change=False, alarm='different timestamp'):
@@ -1375,6 +1391,32 @@ class ClockPartyTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'readback mismatch'):
                 client.write_control('partyMode', True)
             self.assertEqual(len([c for c in server.commands if c.startswith('setPartyModeA1')]), before + 1)
+            client.disconnect()
+        finally: server.stop()
+
+    def test_alarm_content_ignores_only_clock_and_retains_unknown_bytes(self):
+        server = FixtureServer()
+        try:
+            client = Client(server.settings())
+            baseline = client.fault()
+            self.assertTrue(baseline.alarm_content)
+            raw = server.alarm_reply.split()
+            for i, value in enumerate(('EB', '07', '0C', '10', '14', '20', '21'), 16):
+                raw[i] = value
+            server.alarm_reply = ' '.join(raw)
+            clock_only = client.fault()
+            self.assertNotEqual(clock_only.alarm, baseline.alarm)
+            self.assertEqual(clock_only.alarm_content, baseline.alarm_content)
+            raw[28] = 'D1'  # changeFlag is still False: this is the owner's missed case
+            server.alarm_reply = ' '.join(raw)
+            fault = client.fault()
+            self.assertFalse(fault.alarm_change_flag)
+            self.assertNotEqual(fault.alarm_content, baseline.alarm_content)
+            raw[8] = '01'  # preserve changes even in an undecoded payload member
+            server.alarm_reply = ' '.join(raw)
+            self.assertNotEqual(client.fault().alarm_content, fault.alarm_content)
+            server.alarm_reply = ' '.join(['FF'] * 29)
+            self.assertEqual(client.fault().alarm_content, '')
             client.disconnect()
         finally: server.stop()
 

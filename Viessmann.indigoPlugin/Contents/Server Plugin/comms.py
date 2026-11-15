@@ -114,6 +114,7 @@ class Result:
     alarm: str = ''
     alarm_raw: str = ''
     alarm_change_flag: bool | None = None
+    alarm_content: str = ''
     fault_record: str = ''
     relay_status: str = ''
     fault_checked: str = ''
@@ -319,7 +320,10 @@ class Client:
                     raise ValueError('Fault sampling failed: ' + text[:160])
                 if attribute == 'alarm':
                     text = alarm_block(text)
-                    result.alarm_change_flag = bool(bytes.fromhex(result.alarm_raw)[14] & 0x10)
+                    raw = bytes.fromhex(result.alarm_raw)
+                    result.alarm_change_flag = bool(raw[14] & 0x10)
+                    result.alarm_content = ','.join('%d:%02X' % (i, byte)
+                                                    for i, byte in enumerate(raw) if not 16 <= i <= 22)
                 elif attribute == 'relay_status':
                     if not re.fullmatch(r'[0-9A-Fa-f]{2} [0-9A-Fa-f]{2}', text):
                         raise ValueError('Invalid relay status: ' + text[:160])

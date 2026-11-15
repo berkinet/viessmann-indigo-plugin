@@ -394,6 +394,7 @@ class Plugin(indigo.PluginBase):
                             {'key': 'productionStatusValid', 'value': False},
                             {'key': 'alarmBlock', 'value': 'Unavailable: ' + reason},
                             {'key': 'alarmChangeFlagValid', 'value': False},
+                            {'key': 'alarmBlockContentValid', 'value': False},
                             {'key': 'burnerOutputValid', 'value': False},
                             {'key': 'burnerStatusValid', 'value': False},
                             {'key': 'tcpAvailable', 'value': False},
@@ -460,14 +461,18 @@ class Plugin(indigo.PluginBase):
                             {'key': 'opticalActivityError', 'value': result.optical_error}])
         if not result.health_ok:
             updates.extend([{'key': 'alarmBlock', 'value': 'Unavailable: controller health check failed'},
-                            {'key': 'alarmChangeFlagValid', 'value': False}])
+                            {'key': 'alarmChangeFlagValid', 'value': False},
+                            {'key': 'alarmBlockContentValid', 'value': False}])
             updates.extend([{'key': 'burnerStatusValid', 'value': False},
                             {'key': 'burnerOutputValid', 'value': False},
                             {'key': 'productionStatusValid', 'value': False}])
         if result.fault_only:
             updates.extend([{'key': 'alarmBlock', 'value': result.alarm or 'Unavailable: ' + (result.fault_error or 'alarm read not completed')},
                             {'key': 'alarmBlockRaw', 'value': result.alarm_raw},
-                            {'key': 'alarmChangeFlagValid', 'value': result.alarm_change_flag is not None}])
+                            {'key': 'alarmChangeFlagValid', 'value': result.alarm_change_flag is not None},
+                            {'key': 'alarmBlockContentValid', 'value': bool(result.alarm_content)}])
+            if result.alarm_content:
+                updates.append({'key': 'alarmBlockContent', 'value': result.alarm_content})
             if result.alarm_change_flag is not None:
                 updates.append({'key': 'alarmChangeFlag', 'value': result.alarm_change_flag})
             updates.extend([{'key': 'productionStatusValid', 'value': result.production_status is not None},

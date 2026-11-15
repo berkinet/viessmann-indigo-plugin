@@ -84,3 +84,10 @@ Adds burnerOn with the owner-requested productionFault Off override; otherwise
 the existing burner-output logic applies. Adds alarmChangeFlag and validity
 states so triggers need not watch the timestamp-bearing alarmBlock string.
 See [fault override and alarm flag](docs/burner-fault-override.md).
+
+## Version 0.2.27
+
+Adds **Alarm block contents (excluding time)** (`alarmBlockContent`). Trigger on
+any change in that state and log the full `alarmBlock`; timestamp-only updates
+no longer cause log entries. Invalid reads retain content with validity false.
+See [alarm logging](docs/alarm-block.md#timestamp-independent-change-trigger--0227).
