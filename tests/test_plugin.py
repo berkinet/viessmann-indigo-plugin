@@ -29,8 +29,9 @@ class FixtureServer(socketserver.ThreadingTCPServer):
         self.close_reply = close_reply
         self.activity_reply = 'Result: 05'
         self.clock_reply = '2026-11-13T14:37:23+0000'
-        self.targets = {'getRoomTempSP': '19', 'getTempWWsoll': '50'}
+        self.targets = {'getRoomTempSP': '19', 'getTempWWsoll': '50', 'getTempPartyM1': '15'}
         self.holidays = {'getHolidayStart': '1970-01-01T00:00:00+0000', 'getHolidayEnd': '1970-01-01T00:00:00+0000'}
+        self.party_mode = '0'
         self.holiday_raw = '02'
         self.output_reply = '4B 01'
         self.production_reply = '00 00 00 00'
@@ -78,6 +79,14 @@ class FixtureServer(socketserver.ThreadingTCPServer):
                             getter = 'getHolidayStart' if setter == 'setHolidayStart' else 'getHolidayEnd'
                             if owner.apply_setter: owner.holidays[getter] = value
                             reply = owner.setter_reply + '\nvctrld> '
+                        elif command == 'getPartyModeA1':
+                            reply = owner.party_mode + '\nvctrld> '
+                        elif command.startswith('setPartyModeA1 '):
+                            if owner.apply_setter: owner.party_mode = command.split()[1]
+                            reply = owner.setter_reply + '\nvctrld> '
+                        elif command.startswith('setSystemTime '):
+                            if owner.apply_setter: owner.clock_reply = command.split()[1]
+                            reply = owner.setter_reply + '\nvctrld> '
                         elif command == 'getProbeOutputStatus':
                             reply = owner.output_reply + '\nvctrld> '
                         elif command == 'getProbeAlarmBlockRaw':
@@ -96,12 +105,12 @@ class FixtureServer(socketserver.ThreadingTCPServer):
                             reply = owner.clock_reply + '\nvctrld> '
                         elif command == 'device':
                             reply = owner.identity + '\nvctrld> '
-                        elif command.startswith(('setTempRaumNorSollM1 ', 'setTempWWsoll ')):
+                        elif command.startswith(('setTempRaumNorSollM1 ', 'setTempWWsoll ', 'setTempPartyM1 ')):
                             setter, value = command.split()
-                            read = 'getRoomTempSP' if setter == 'setTempRaumNorSollM1' else 'getTempWWsoll'
+                            read = {'setTempRaumNorSollM1': 'getRoomTempSP', 'setTempWWsoll': 'getTempWWsoll', 'setTempPartyM1': 'getTempPartyM1'}[setter]
                             if owner.apply_setter: owner.targets[read] = value
                             reply = owner.setter_reply + '\nvctrld> '
-                        elif command == 'getTempWWsoll' or (command == 'getRoomTempSP' and any(c.startswith('setTempRaumNorSollM1 ') for c in owner.commands)):
+                        elif command in ('getTempWWsoll', 'getTempPartyM1') or (command == 'getRoomTempSP' and any(c.startswith('setTempRaumNorSollM1 ') for c in owner.commands)):
                             reply = owner.targets[command] + '\nvctrld> '
                         elif command == 'close':
                             reply = (owner.close_reply or '/dev/test closed') + '\nvctrld> '
@@ -374,7 +383,7 @@ class TransportTests(unittest.TestCase):
         try:
             self.assertEqual(client.write_setpoint('standard', 21), 21)
             self.assertEqual(client.write_setpoint('dhw', 51), 51)
-            for target in ('reduced', 'party'):
+            for target in ('reduced',):
                 with self.assertRaises(PermissionError): client.write_setpoint(target, 20)
             server.identity = 'V200KW2 (ID=2098) (Protocol=KW2)'
             with self.assertRaises(PermissionError): client.write_setpoint('dhw', 50)
@@ -739,6 +748,35 @@ class AdapterTests(unittest.TestCase):
             del stub.variables
             del stub.variable
 
+    def test_clock_and_party_actions_queue_and_reject_endpoint_changes(self):
+        self.devices[1].pluginProps['pollingEnabled'] = True
+        self.plugin._configure()
+        calls = []
+        self.plugin.manager.write_control = lambda *args: calls.append(args) or True
+        self.plugin.setPartyMode(types.SimpleNamespace(props={'mode': 'on'}), self.devices[2])
+        self.devices[1].pluginProps['host'] = 'different'
+        self.plugin._process_events()
+        self.assertFalse(calls)
+        self.assertIn('Configuration changed', self.devices[2].states['actionStatus'])
+        self.plugin.syncSystemTime(types.SimpleNamespace(props={}), self.devices[1])
+        self.plugin.manager.write_control = lambda *args: '2026-11-15T14:00:00+0000'
+        self.plugin._process_events()
+        self.assertIn('readback confirmed', self.devices[1].states['clockActionStatus'])
+
+    def test_connection_loss_does_not_remove_native_setpoint_schema(self):
+        self.devices[1].pluginProps['pollingEnabled'] = True
+        self.plugin.pluginPrefs['liveWritesEnabled'] = True
+        self.plugin._configure()
+        values = readings(66, 12, 22, 50)
+        values.update(roomMeasuredTemp=21, dhwSetpoint=50)
+        self.plugin._publish(Result(values=values, tcp_available=True, live_identity=True, health_ok=True))
+        self.plugin._publish(Result(tcp_available=False, errors={'boilerTemp': 'Connection refused'}))
+        for ident in (2, 3):
+            self.assertTrue(self.devices[ident].pluginProps['SupportsHeatSetpoint'])
+            self.assertIn('setpointHeat', self.devices[ident].states)
+        self.plugin._publish(Result(values=values, tcp_available=True, live_identity=True, health_ok=True))
+        self.assertEqual(self.devices[2].states['setpointHeat'], 22)
+
     def test_native_setpoint_waits_for_asynchronous_schema_restore(self):
         self.devices[1].pluginProps['pollingEnabled'] = True
         self.plugin.pluginPrefs['liveWritesEnabled'] = True
@@ -895,7 +933,7 @@ class AdapterTests(unittest.TestCase):
         self.plugin._publish(result)
         self.assertTrue(self.devices[2].pluginProps['SupportsHeatSetpoint'])
         self.assertTrue(self.devices[3].pluginProps['SupportsHeatSetpoint'])
-        self.devices[2].pluginProps['roomTarget'] = 'party'
+        self.devices[2].pluginProps['roomTarget'] = 'reduced'
         self.plugin._publish(result)
         self.assertFalse(self.devices[2].pluginProps['SupportsHeatSetpoint'])
         self.devices[2].pluginProps['roomTarget'] = 'standard'
@@ -1244,3 +1282,47 @@ class AlarmDecodeTests(unittest.TestCase):
         self.assertIn('12:19,13:17', decoded)
         for invalid in ('00', ' '.join(['05']*29), ' '.join(['FF']*29)):
             with self.assertRaises(ValueError): alarm_block(invalid)
+
+class ClockPartyTests(unittest.TestCase):
+    def test_opt_in_identity_bounds_and_readback(self):
+        server = FixtureServer()
+        try:
+            client = Client(server.settings())
+            for kind, value in [('clock', None), ('partyMode', True), ('partyTemperature', 20)]:
+                with self.assertRaises(PermissionError): client.write_control(kind, value)
+            self.assertFalse(any(c.startswith('set') for c in server.commands))
+            client.disconnect()
+            client = Client(server.settings(live_writes=True))
+            for bad in (3, 38, 20.5, float('nan')):
+                with self.assertRaises(ValueError): client.write_control('partyTemperature', bad)
+            with self.assertRaises(ValueError): client.write_control('partyMode', 'on')
+            self.assertEqual(client.write_control('partyTemperature', 23), 23)
+            self.assertTrue(client.write_control('partyMode', True))
+            self.assertFalse(client.write_control('partyMode', False))
+            server.apply_setter = False
+            before = len([c for c in server.commands if c.startswith('setPartyModeA1')])
+            with self.assertRaisesRegex(ValueError, 'readback mismatch'):
+                client.write_control('partyMode', True)
+            self.assertEqual(len([c for c in server.commands if c.startswith('setPartyModeA1')]), before + 1)
+            client.disconnect()
+        finally: server.stop()
+
+    def test_clock_uses_mac_instant_in_heater_zone_and_verifies(self):
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        server = FixtureServer()
+        try:
+            client = Client(server.settings(live_writes=True, heater_timezone='Europe/Paris'))
+            actual = client.write_control('clock')
+            now = datetime.now(ZoneInfo('Europe/Paris')).replace(tzinfo=None)
+            parsed = datetime.strptime(actual, '%Y-%m-%dT%H:%M:%S%z').replace(tzinfo=None)
+            self.assertLess(abs((parsed-now).total_seconds()), 5)
+            self.assertIsNone(client.last_health)
+            server.clock_reply = '2026-11-13T14:37:23+0100'
+            with self.assertRaises(PermissionError): client.write_control('clock')
+            server.clock_reply = '2026-11-13T14:37:23+0000'
+            server.apply_setter = False
+            with self.assertRaisesRegex(ValueError, 'Clock readback mismatch'):
+                client.write_control('clock')
+            client.disconnect()
+        finally: server.stop()

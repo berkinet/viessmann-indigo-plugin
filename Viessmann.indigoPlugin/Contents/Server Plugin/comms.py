@@ -15,7 +15,7 @@ TARGETS = {'standard': ('getRoomTempSP', 'setTempRaumNorSollM1'),
            'party': ('getTempPartyM1', 'setTempPartyM1'),
            'dhw': ('getTempWWsoll', 'setTempWWsoll')}
 LIVE_ID = 'V200KO2B (ID=209F) (Protocol=KW2)'
-LIVE_TARGETS = {'standard', 'dhw'}
+LIVE_TARGETS = {'standard', 'dhw', 'party'}
 SIMULATOR_ID = 'SIMULATOR_209F (ID=209F) (Protocol=KW2)'
 TEMPERATURE = re.compile(r'([+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+))(?:[ \t]*(?:°?C))?')
 
@@ -196,7 +196,7 @@ class Client:
         return frame.decode('ascii').strip()
 
     def _exchange(self, command, cancelled):
-        allowed = HOLIDAY_READS | set(READS.values()) | {v[0] for v in TARGETS.values()} | {'getProbeAlarmBlockRaw', 'getProbeRoomTemp', 'getSystemTime', 'getError0', 'getProbeRelayStatus', 'getProbeProductionStatus', 'getProbeBurner1', 'getProbeOutputStatus', 'device', 'close'}
+        allowed = HOLIDAY_READS | set(READS.values()) | {v[0] for v in TARGETS.values()} | {'getPartyModeA1', 'getProbeAlarmBlockRaw', 'getProbeRoomTemp', 'getSystemTime', 'getError0', 'getProbeRelayStatus', 'getProbeProductionStatus', 'getProbeBurner1', 'getProbeOutputStatus', 'device', 'close'}
         if command not in allowed:
             raise ValueError('Command is not an allowed read or link release')
         self.sock.settimeout(self.settings.timeout)
@@ -465,12 +465,63 @@ class Client:
             self.disconnect()
             raise
 
+    def write_control(self, kind, value=None, cancelled=lambda: False):
+        if kind == 'partyTemperature':
+            return self.write_setpoint('party', value, cancelled)
+        if kind not in ('clock', 'partyMode'):
+            raise ValueError('Unknown controller action')
+        if kind == 'partyMode' and type(value) is not bool:
+            raise ValueError('Party mode must be explicitly On or Off')
+        try:
+            self._connect(cancelled)
+            identity = self._exchange('device', cancelled)
+            if identity != LIVE_ID or not self.settings.live_writes:
+                raise PermissionError('Clock and party mode require live-write opt-in and verified KO2B')
+            health = Result()
+            if self._ensure_health(health, cancelled) != identity:
+                raise PermissionError('Controller identity changed')
+            if kind == 'partyMode':
+                current = self._exchange('getPartyModeA1', cancelled)
+                if current not in ('0', '1'):
+                    raise ValueError('Invalid current party mode')
+                command = 'setPartyModeA1 %d' % value
+            else:
+                current = self._exchange('getSystemTime', cancelled)
+                if not re.fullmatch(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+0000', current):
+                    raise PermissionError('Clock writes require the verified UTC vcontrold TI transport')
+                # Indigo runs on the Mac. Take its current instant at execution,
+                # express it as heater-local fields, then avoid daemon offset shifts.
+                expected = datetime.now(ZoneInfo(self.settings.heater_timezone)).replace(tzinfo=None, microsecond=0)
+                command = 'setSystemTime ' + expected.strftime('%Y-%m-%dT%H:%M:%S+0000')
+            if cancelled():
+                raise InterruptedError('Cancelled before controller write')
+            sent = time.monotonic()
+            self.sock.settimeout(self.settings.timeout)
+            self.sock.sendall((command + '\n').encode('ascii'))
+            if self._frame(cancelled) != 'OK':
+                raise ValueError('Setter not acknowledged; result uncertain, not retried')
+            actual = self._exchange('getSystemTime' if kind == 'clock' else 'getPartyModeA1', cancelled)
+            if kind == 'partyMode':
+                if actual != str(int(value)):
+                    raise ValueError('Party-mode readback mismatch; not retried')
+                return value
+            if not actual.endswith('+0000'):
+                raise ValueError('Clock transport offset changed; result uncertain')
+            clock = datetime.strptime(actual, '%Y-%m-%dT%H:%M:%S%z').replace(tzinfo=None)
+            if not -1 <= (clock - expected).total_seconds() <= time.monotonic() - sent + 3:
+                raise ValueError('Clock readback mismatch; result uncertain, not retried')
+            self.last_health = None
+            return actual
+        except (OSError, ValueError, UnicodeError):
+            self.disconnect()
+            raise
+
     def write_setpoint(self, target, value, cancelled=lambda: False):
         """Fresh endpoint identity, explicit live opt-in, one setter and readback; no retries."""
         if target not in TARGETS:
             raise ValueError('Unknown target')
         number = float(value)
-        low, high = (10, 60) if target == 'dhw' else (3, 37)
+        low, high = (10, 60) if target == 'dhw' else ((4, 37) if target == 'party' else (3, 37))
         if not math.isfinite(number) or not number.is_integer() or not low <= number <= high:
             raise ValueError('Target must be a whole degree from %s to %s' % (low, high))
         try:
@@ -583,6 +634,13 @@ class Manager:
         if self.client is None:
             self.client = self.client_factory(self.settings)
         return self.client.write_holiday(departure, returning, cancelled, clear=clear)
+
+    def write_control(self, kind, value=None, cancelled=lambda: False):
+        if self.settings is None or not self.settings.enabled:
+            raise PermissionError('Polling must be enabled for controller actions')
+        if self.client is None:
+            self.client = self.client_factory(self.settings)
+        return self.client.write_control(kind, value, cancelled)
 
     def close(self):
         self.requested = False

@@ -31,4 +31,17 @@
     <Name>Clear holiday dates</Name>
     <CallbackMethod>clearHoliday</CallbackMethod>
   </Action>
+  <Action id="syncSystemTime" deviceFilter="self.viessmannSystem">
+    <Name>Set controller clock from Mac server time</Name><CallbackMethod>syncSystemTime</CallbackMethod>
+  </Action>
+  <Action id="setPartyTemperature" deviceFilter="self.viessmannHeater">
+    <Name>Set party room temperature</Name><CallbackMethod>setPartyTemperature</CallbackMethod>
+    <ConfigUI><Field id="temperature" type="textfield" defaultValue="20"><Label>Party temperature (4–37 C, whole degrees):</Label></Field></ConfigUI>
+  </Action>
+  <Action id="setPartyMode" deviceFilter="self.viessmannHeater">
+    <Name>Set party mode On / Off</Name><CallbackMethod>setPartyMode</CallbackMethod>
+    <ConfigUI><Field id="mode" type="menu" defaultValue="off"><Label>Party mode:</Label>
+      <List><Option value="on">On</Option><Option value="off">Off</Option></List>
+    </Field></ConfigUI>
+  </Action>
 </Actions>

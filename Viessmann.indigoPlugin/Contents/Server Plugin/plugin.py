@@ -105,6 +105,16 @@ class Plugin(indigo.PluginBase):
         self.events.put(('start', dev.id))
 
     def validateActionConfigUi(self, valuesDict, typeId, actionId):
+        if typeId == 'setPartyTemperature':
+            try:
+                value = float(valuesDict.get('temperature', ''))
+                if not 4 <= value <= 37 or not value.is_integer():
+                    raise ValueError()
+            except (TypeError, ValueError):
+                errors = indigo.Dict()
+                errors['temperature'] = 'Enter a whole temperature from 4 to 37 C'
+                return False, valuesDict, errors
+            return True, valuesDict
         if typeId != 'setHoliday':
             return True, valuesDict
         errors = indigo.Dict()
@@ -125,6 +135,36 @@ class Plugin(indigo.PluginBase):
             self.events.put(('holiday', (dev.id, departure, returning, self.manager.settings)))
         except (ValueError, TypeError) as exc:
             self.logger.error('Holiday action rejected: %s', exc)
+
+    def _queue_controller_action(self, dev, kind, value=None):
+        system = dev.deviceTypeId == 'viessmannSystem'
+        if (kind == 'clock' and (not system or dev.id != self.system_id)) or (
+                kind != 'clock' and (dev.deviceTypeId != 'viessmannHeater' or
+                str(dev.pluginProps.get('systemId', '')) != str(self.system_id))):
+            self.logger.error('Select the active system for clock sync or its heater for party controls')
+            return
+        status_key = 'clockActionStatus' if system else 'actionStatus'
+        dev.updateStatesOnServer([{'key': status_key, 'value': 'Pending ' + kind + ' confirmation'}])
+        self.events.put(('controllerAction', (dev.id, kind, value, self.manager.settings)))
+
+    def syncSystemTime(self, action, dev):
+        self._queue_controller_action(dev, 'clock')
+
+    def setPartyTemperature(self, action, dev):
+        try:
+            value = float(action.props.get('temperature', ''))
+            if not 4 <= value <= 37 or not value.is_integer():
+                raise ValueError('Party temperature must be a whole degree from 4 to 37 C')
+            self._queue_controller_action(dev, 'partyTemperature', value)
+        except (ValueError, TypeError) as exc:
+            self.logger.error('Party action rejected: %s', exc)
+
+    def setPartyMode(self, action, dev):
+        mode = action.props.get('mode')
+        if mode not in ('on', 'off'):
+            self.logger.error('Choose Party mode On or Off')
+            return
+        self._queue_controller_action(dev, 'partyMode', mode == 'on')
 
     def clearHoliday(self, action, dev):
         if dev.deviceTypeId != 'viessmannSystem' or dev.id != self.system_id:
@@ -243,7 +283,7 @@ class Plugin(indigo.PluginBase):
             simulated = dev.states.get('simulator', False)
             if not dev.states.get('dataValid', False):
                 raise ValueError('A valid current reading is required before editing')
-            if not simulated and (not self._live_writes_enabled() or target not in ('standard', 'dhw')):
+            if not simulated and (not self._live_writes_enabled() or target not in ('standard', 'dhw', 'party')):
                 raise ValueError('Live setpoint writes are disabled for this target')
             value = float(requested)
             if kind != 'set':
@@ -510,13 +550,18 @@ class Plugin(indigo.PluginBase):
                 target = dev.pluginProps.get('roomTarget', 'standard')
                 target_key = 'roomSetpoint' if dev.deviceTypeId == 'viessmannHeater' else 'dhwSetpoint'
                 live_allowed = (self._live_writes_enabled() and result.live_identity and result.health_ok
-                                and (target == 'standard' or dev.deviceTypeId == 'viessmannWaterHeater'))
+                                and (target in ('standard', 'party') or dev.deviceTypeId == 'viessmannWaterHeater'))
                 writable = (not provisional and (result.simulator or live_allowed)
                             and valid and target_key in result.values)
                 # Intermediate readings must not toggle capability properties: Indigo
                 # may restart device communications when these properties change.
                 if not provisional:
-                    self._native_capabilities(dev, result.simulator, writable)
+                    # A failed reading is not a capability change. Removing and
+                    # restoring native states races Indigo's asynchronous schema.
+                    preserve = (not valid and self._live_writes_enabled()
+                                and (target in ('standard', 'party') or dev.deviceTypeId == 'viessmannWaterHeater')
+                                and dev.pluginProps.get('SupportsHeatSetpoint') is True)
+                    self._native_capabilities(dev, result.simulator, writable or preserve)
                 if dev.deviceTypeId == 'viessmannHeater':
                     updates.append({'key': 'selectedTarget', 'value': target.title()})
                     if 'roomMeasuredTemp' in result.values:
@@ -560,6 +605,33 @@ class Plugin(indigo.PluginBase):
                 dev = self._device(device_id)
                 if (dev is not None and device_id in self.active and self.manager.settings is not None
                         and (device_id == self.system_id or str(dev.pluginProps.get('systemId', '')) == str(self.system_id))):
+                    self.manager.request_poll()
+                continue
+            if action == 'controllerAction':
+                ident, kind, value, expected = device_id
+                self._configure()
+                dev = self._device(ident)
+                if dev is None:
+                    continue
+                key = 'clockActionStatus' if kind == 'clock' else 'actionStatus'
+                try:
+                    if expected is None or expected != self.manager.settings or ident not in self.active:
+                        raise ValueError('Configuration changed before action; retry explicitly')
+                    if kind == 'clock':
+                        if ident != self.system_id:
+                            raise ValueError('Active system changed')
+                    elif str(dev.pluginProps.get('systemId', '')) != str(self.system_id):
+                        raise ValueError('Parent system changed')
+                    actual = self.manager.write_control(kind, value, self.closing.is_set)
+                    state = {'clock': 'controllerTime', 'partyMode': 'partyMode',
+                             'partyTemperature': 'partyTemperature'}[kind]
+                    dev.updateStatesOnServer([{'key': state, 'value': actual},
+                        {'key': key, 'value': kind + ' readback confirmed'}])
+                    self.logger.info('%s: %s readback confirmed: %s', dev.name, kind, actual)
+                except (OSError, ValueError, KeyError, TypeError) as exc:
+                    dev.updateStatesOnServer([{'key': key, 'value': str(exc)}])
+                    self.logger.error('Controller action rejected/failed: %s', exc)
+                finally:
                     self.manager.request_poll()
                 continue
             if action in ('holiday', 'clearHoliday'):

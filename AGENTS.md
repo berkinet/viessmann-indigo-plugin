@@ -78,3 +78,13 @@ The owner requested explicit Unset, Set (not active), and Active states and peri
 Display time must be local to the heater location, not the viewer. The system heaterTimeZone property defaults to Europe/Paris; lastHealthCheckLocal uses that zone with daylight-saving rules. Preserve the existing UTC timestamps for logs and comparisons. Owner installs releases from GitHub; do not install locally on their behalf.
 
 Owner authorized a dedicated holiday-clear action on 14 November: write both 1970-01-01 sentinel dates with existing identity/opt-in/health/ACK/readback safeguards. This supersedes cancellation being unimplemented. Live clearing still requires owner testing; do not report success from dispatch alone.
+
+## Clock and party actions authorized — 15 November 2026
+
+Owner requested clock synchronization from Mac server time, party target setting
+and party On/Off actions. This extends permitted live-write scope to these three
+controls, through existing opt-in, exact KO2B identity, bounded input and ACK/readback
+safeguards. Party temperature is 4–37 C; reduced target remains simulator-only.
+Use KO2B party mode at 2330, not legacy 2303. See docs/clock-party-actions.md.
+Clock must use the current Mac instant expressed in heater-local time; the tested
+TI transport requires UTC vcontrold. No automatic synchronization or blind retries.

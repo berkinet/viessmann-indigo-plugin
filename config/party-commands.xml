@@ -1,0 +1,10 @@
+<!-- Merge inside vito.xml <commands>. Verified for installed KO2B 209F only.
+     Global fields are required by this vcontrold parser; plugin guards identity. -->
+<command name="getPartyModeA1" protocmd="getaddr">
+  <addr>2330</addr><len>1</len><unit>RT</unit>
+  <description>KO2B party mode A1 read</description>
+</command>
+<command name="setPartyModeA1" protocmd="setaddr">
+  <addr>2330</addr><len>1</len><unit>RT</unit>
+  <description>KO2B party mode A1 write</description>
+</command>

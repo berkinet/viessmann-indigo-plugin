@@ -74,6 +74,7 @@
       <State id="burnerStatusUpdated"><ValueType>String</ValueType><TriggerLabel>Burner activity last success (UTC)</TriggerLabel><ControlPageLabel>Burner activity last success (UTC)</ControlPageLabel></State>
 
       <State id="lastRecordedError"><ValueType>String</ValueType><TriggerLabel>Last recorded error (history)</TriggerLabel><ControlPageLabel>Last recorded error (history)</ControlPageLabel></State>
+      <State id="clockActionStatus"><ValueType>String</ValueType><TriggerLabel>Clock action result</TriggerLabel><ControlPageLabel>Clock action result</ControlPageLabel></State>
       <State id="alarmBlock"><ValueType>String</ValueType><TriggerLabel>Alarm block decoded (29 bytes)</TriggerLabel><ControlPageLabel>Alarm block decoded</ControlPageLabel></State>
       <State id="alarmBlockRaw"><ValueType>String</ValueType><TriggerLabel>Alarm block raw (29 bytes)</TriggerLabel><ControlPageLabel>Alarm block raw</ControlPageLabel></State>
       <State id="relayStatusRaw"><ValueType>String</ValueType><TriggerLabel>Raw relay status</TriggerLabel><ControlPageLabel>Raw relay status</ControlPageLabel></State>
@@ -202,6 +203,9 @@
       <Field id="SupportsStatusRequest" type="checkbox" defaultValue="true" hidden="true" />
     </ConfigUI>
     <States>
+      <State id="partyMode"><ValueType>Boolean</ValueType><TriggerLabel>Party mode last action readback</TriggerLabel><ControlPageLabel>Party mode last action readback</ControlPageLabel></State>
+      <State id="partyTemperature"><ValueType>Number</ValueType><TriggerLabel>Party temperature last action readback</TriggerLabel><ControlPageLabel>Party temperature last action readback</ControlPageLabel></State>
+
       <State id="roomMeasuredTemp"><ValueType>Number</ValueType><TriggerLabel>Measured room temperature (C)</TriggerLabel><ControlPageLabel>Measured room temperature (C)</ControlPageLabel></State>
       <State id="roomMeasuredTempValid"><ValueType>Boolean</ValueType><TriggerLabel>Measured room temperature valid</TriggerLabel><ControlPageLabel>Measured room temperature valid</ControlPageLabel></State>
       <State id="roomMeasuredTempUpdated"><ValueType>String</ValueType><TriggerLabel>Room temperature last success (UTC)</TriggerLabel><ControlPageLabel>Room temperature last success (UTC)</ControlPageLabel></State>

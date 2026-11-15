@@ -61,3 +61,11 @@ The optional holiday control-page date variables follow confirmed heater date ch
 Adds decoded alarmBlock and raw alarmBlockRaw system states, sampled on the fault-check interval. Includes all 29 bytes and catalogue-defined timestamp, flags, participant and fault code. Diagnostic only; see docs/alarm-block.md.
 
 0.2.23 recovery fix: native setpoint updates wait until Indigo restores setpointHeat after a capability/schema change. Prevents undefined-state errors following communications interruptions; confirmed setpoint readback is retained in custom states.
+
+## Version 0.2.24
+
+Adds system clock synchronization from Mac server time and heater actions for party
+temperature and party On/Off. Existing live-write opt-in is required. Also preserves
+native setpoint capabilities through failed reads to avoid recovery schema races.
+See [clock and party actions](docs/clock-party-actions.md) for command evidence,
+validation and readback-state limitations.
