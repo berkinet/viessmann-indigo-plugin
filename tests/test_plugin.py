@@ -538,7 +538,12 @@ class Device:
     def setErrorStateOnServer(self, error): self.error = error
     def updateStateImageOnServer(self, selector): self.icon = selector
     def stateListOrDisplayStateIdChanged(self): pass
-    def replacePluginPropsOnServer(self, props): self.pluginProps = dict(props)
+    def replacePluginPropsOnServer(self, props):
+        self.pluginProps = dict(props)
+        if props.get('SupportsHeatSetpoint'):
+            self.states.setdefault('setpointHeat', 0)
+        else:
+            self.states.pop('setpointHeat', None)
 
 
 class Devices(dict):
@@ -733,6 +738,29 @@ class AdapterTests(unittest.TestCase):
         finally:
             del stub.variables
             del stub.variable
+
+    def test_native_setpoint_waits_for_asynchronous_schema_restore(self):
+        self.devices[1].pluginProps['pollingEnabled'] = True
+        self.plugin.pluginPrefs['liveWritesEnabled'] = True
+        self.plugin._configure()
+        heater = self.devices[2]
+        # Indigo accepts properties before its native state schema catches up.
+        heater.replacePluginPropsOnServer = lambda props: setattr(heater, 'pluginProps', dict(props))
+        original = heater.updateStatesOnServer
+        def strict_update(updates):
+            if 'setpointHeat' not in heater.states:
+                self.assertFalse(any(u['key'] == 'setpointHeat' for u in updates))
+            original(updates)
+        heater.updateStatesOnServer = strict_update
+        values = readings(66, 12, 22, 50)
+        values.update(roomMeasuredTemp=21, dhwSetpoint=50)
+        result = Result(values=values, tcp_available=True, live_identity=True, health_ok=True)
+        self.plugin._publish(result)
+        self.assertTrue(heater.pluginProps['SupportsHeatSetpoint'])
+        self.assertNotIn('setpointHeat', heater.states)
+        heater.states['setpointHeat'] = 0  # asynchronous schema completion
+        self.plugin._publish(result)
+        self.assertEqual(heater.states['setpointHeat'], 22)
 
     def test_alarm_summary_and_raw_publish_and_failed_sample_is_unavailable(self):
         self.devices[1].pluginProps['pollingEnabled'] = True

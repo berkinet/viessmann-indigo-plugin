@@ -82,6 +82,18 @@ class Plugin(indigo.PluginBase):
             dev.replacePluginPropsOnServer(props)
             dev.stateListOrDisplayStateIdChanged()
 
+    def _native_setpoint_updates(self, dev, value):
+        # Native states can lag capability changes on Indigo's server.
+        if 'setpointHeat' in dev.states:
+            getattr(self, '_pending_native_schema', set()).discard(dev.id)
+            return [{'key': 'setpointHeat', 'value': value}]
+        if not hasattr(self, '_pending_native_schema'):
+            self._pending_native_schema = set()
+        if dev.id not in self._pending_native_schema:
+            self._pending_native_schema.add(dev.id)
+            self.manager.request_poll()
+        return []
+
     def selectRoomTarget(self, action, dev):
         target = action.props.get('target', 'standard')
         if target not in ('standard', 'reduced', 'party'):
@@ -239,7 +251,7 @@ class Plugin(indigo.PluginBase):
                 value = base + value if kind == 'increase' else base - value
             actual = self.manager.write_setpoint(target, value, self.closing.is_set)
             # Publish only confirmed readback; the following full cycle refreshes all states.
-            dev.updateStatesOnServer([{'key': 'setpointHeat', 'value': actual},
+            dev.updateStatesOnServer(self._native_setpoint_updates(dev, actual) + [
                                       {'key': 'roomSetpoint' if target != 'dhw' else 'dhwSetpoint', 'value': actual},
                                       {'key': 'actionStatus', 'value': 'Simulator readback confirmed' if simulated else 'Live readback confirmed'}])
         except (OSError, ValueError, KeyError, TypeError) as exc:
@@ -513,7 +525,7 @@ class Plugin(indigo.PluginBase):
                 elif 'warmWaterTemp' in result.values:
                     updates.append({'key': 'temperatureInput1', 'value': result.values['warmWaterTemp']})
                 if writable:
-                    updates.append({'key': 'setpointHeat', 'value': result.values[target_key]})
+                    updates.extend(self._native_setpoint_updates(dev, result.values[target_key]))
                 if target_key == 'dhwSetpoint' and target_key in result.values:
                     updates.append({'key': 'dhwSetpoint', 'value': result.values[target_key]})
             if result.simulator:

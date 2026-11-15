@@ -59,3 +59,5 @@ The optional holiday control-page date variables follow confirmed heater date ch
 ## Version 0.2.23
 
 Adds decoded alarmBlock and raw alarmBlockRaw system states, sampled on the fault-check interval. Includes all 29 bytes and catalogue-defined timestamp, flags, participant and fault code. Diagnostic only; see docs/alarm-block.md.
+
+0.2.23 recovery fix: native setpoint updates wait until Indigo restores setpointHeat after a capability/schema change. Prevents undefined-state errors following communications interruptions; confirmed setpoint readback is retained in custom states.
