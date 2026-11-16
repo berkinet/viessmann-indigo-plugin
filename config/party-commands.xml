@@ -8,3 +8,9 @@
   <addr>2330</addr><len>1</len><unit>RT</unit>
   <description>KO2B party mode A1 write</description>
 </command>
+
+<!-- Raw diagnostic: a subsequent sample, not the byte underlying an earlier RT reply. -->
+<command name="getProbePartyModeRaw" protocmd="getaddr">
+  <description>KO2B party mode raw byte, read-only diagnostic</description>
+  <device ID="209F"><addr>2330</addr><len>1</len></device>
+</command>

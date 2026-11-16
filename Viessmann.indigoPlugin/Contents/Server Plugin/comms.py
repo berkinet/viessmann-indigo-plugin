@@ -141,6 +141,7 @@ class Result:
     room_target: str = ''
     party_setpoint: float | None = None
     party_temperature: float | None = None
+    diagnostics: list = field(default_factory=list)
 
 
 def alarm_block(text):
@@ -205,12 +206,63 @@ class Client:
         return frame.decode('ascii').strip()
 
     def _exchange(self, command, cancelled):
-        allowed = HOLIDAY_READS | set(READS.values()) | {v[0] for v in TARGETS.values()} | {'getPartyModeA1', 'getProbeAlarmBlockRaw', 'getProbeRoomTemp', 'getSystemTime', 'getError0', 'getProbeRelayStatus', 'getProbeProductionStatus', 'getProbeBurner1', 'getProbeOutputStatus', 'device', 'close'}
+        allowed = HOLIDAY_READS | set(READS.values()) | {v[0] for v in TARGETS.values()} | {'getPartyModeA1', 'getProbePartyModeRaw', 'getProbeAlarmBlockRaw', 'getProbeRoomTemp', 'getSystemTime', 'getError0', 'getProbeRelayStatus', 'getProbeProductionStatus', 'getProbeBurner1', 'getProbeOutputStatus', 'device', 'close'}
         if command not in allowed:
             raise ValueError('Command is not an allowed read or link release')
-        self.sock.settimeout(self.settings.timeout)
-        self.sock.sendall((command + '\n').encode('ascii'))
-        return self._frame(cancelled)
+        started = time.monotonic()
+        try:
+            self.sock.settimeout(self.settings.timeout)
+            self.sock.sendall((command + '\n').encode('ascii'))
+            return self._frame(cancelled)
+        except InterruptedError:
+            raise
+        except (OSError, ValueError, UnicodeError) as exc:
+            message = 'Communication failure: %s after %.2fs: %s' % (
+                command, time.monotonic() - started, exc)
+            error_type = (TimeoutError if isinstance(exc, TimeoutError) else
+                          OSError if isinstance(exc, OSError) else
+                          UnicodeError if isinstance(exc, UnicodeError) else ValueError)
+            raise error_type(message) from exc
+
+    def _read_value(self, command, decode, result, cancelled):
+        # Polling only: exactly two attempts. Never called by a setter.
+        for attempt in (1, 2):
+            if cancelled():
+                raise InterruptedError('Polling cancelled')
+            started = time.monotonic()
+            response = None
+            try:
+                if self.sock is None:
+                    self._ensure_health(result, cancelled, force=True)
+                response = self._exchange(command, cancelled)
+                if response.startswith('ERR') or 'Error executing' in response:
+                    raise ValueError(response)
+                value = decode(response)
+                if attempt == 2:
+                    result.diagnostics.append('%s recovered on read retry' % command)
+                return value
+            except InterruptedError:
+                self.disconnect()
+                raise
+            except (OSError, ValueError, UnicodeError) as exc:
+                if isinstance(exc, OSError) or response is None:
+                    source = 'Communication failure'
+                elif response.startswith('ERR') or 'Error executing' in response:
+                    source = 'vcontrold-reported error'
+                elif 'UNKNOWN' in response:
+                    source = 'vcontrold returned an unmapped value'
+                else:
+                    source = 'Plugin data-validation error'
+                detail = source + ': %s read attempt %d/2 after %.2fs: %s; reply=%r' % (
+                    command, attempt, time.monotonic() - started, exc,
+                    response[:400] if response is not None else None)
+                result.diagnostics.append(detail)
+                # Discard any partial frame before retrying on a fresh session.
+                self.disconnect()
+                if attempt == 2:
+                    if isinstance(exc, OSError):
+                        raise OSError(detail) from exc
+                    raise ValueError(detail) from exc
 
     def _activity_probe(self, result, identity, cancelled):
         if not self.settings.activity_probe:
@@ -261,7 +313,10 @@ class Client:
                 or time.monotonic() - self.last_health >= self.settings.health_interval):
             text = self._exchange('getSystemTime', cancelled)
             if not re.fullmatch(r'20[0-9]{2}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[+-][0-9]{4}', text):
-                raise ValueError('Invalid controller time: ' + text[:160])
+                source = ('vcontrold-reported error' if text.startswith('ERR') else
+                          'vcontrold returned an unmapped value' if 'UNKNOWN' in text else
+                          'Plugin data-validation error')
+                raise ValueError(source + ': getSystemTime: Invalid controller time: ' + text[:160])
             datetime.strptime(text, '%Y-%m-%dT%H:%M:%S%z')
             self.last_health = time.monotonic()
             self.last_system_time = text
@@ -363,6 +418,10 @@ class Client:
                     raise ValueError('Invalid error history: ' + text[:160])
                 setattr(result, attribute, text)
             except ValueError as exc:
+                source = ('vcontrold-reported error' if text.startswith('ERR') or 'Error executing' in text else
+                          'vcontrold returned an unmapped value' if 'UNKNOWN' in text else
+                          'Plugin data-validation error')
+                exc = ValueError('%s: %s: %s; reply=%r' % (source, command, exc, text[:160]))
                 errors.append(str(exc))
                 if attribute == 'burner_output':
                     result.burner_output_error = str(exc)
@@ -387,17 +446,27 @@ class Client:
             return
         result.party_attempted = True
         try:
-            raw = self._exchange('getPartyModeA1', cancelled)
-            if raw not in ('0', '1'):
-                raise ValueError('Invalid party mode: ' + raw[:80])
+            def party_mode(raw):
+                if raw not in ('0', '1'):
+                    # Separate read, not claimed to be the same sample as UNKNOWN.
+                    try:
+                        diagnostic = self._exchange('getProbePartyModeRaw', cancelled)
+                    except InterruptedError:
+                        raise
+                    except (OSError, ValueError, UnicodeError) as exc:
+                        diagnostic = 'unavailable: ' + str(exc)
+                    raise ValueError('Invalid party mode: %r; subsequent raw byte=%r' %
+                                     (raw[:80], diagnostic[:160]))
+                return raw
+            raw = self._read_value('getPartyModeA1', party_mode, result, cancelled)
             result.party_mode = raw == '1'
             result.party_checked = datetime.now(timezone.utc).isoformat(timespec='seconds')
             result.room_target = 'party' if result.party_mode else self.settings.target
-            party = temperature(self._exchange('getTempPartyM1', cancelled))
+            party = self._read_value('getTempPartyM1', temperature, result, cancelled)
             if not 4 <= party <= 37:
                 raise ValueError('Party target outside permitted bounds')
             result.party_temperature = party
-            value = party if result.room_target == 'party' else temperature(self._exchange(TARGETS[result.room_target][0], cancelled))
+            value = party if result.room_target == 'party' else self._read_value(TARGETS[result.room_target][0], temperature, result, cancelled)
             low = 4 if result.room_target == 'party' else 3
             if not low <= value <= 37:
                 raise ValueError('Room target outside permitted bounds')
@@ -434,19 +503,12 @@ class Client:
             reads['dhwSetpoint'] = 'getTempWWsoll'
         for key, command in reads.items():
             try:
-                try:
-                    response = self._exchange(command, cancelled)
-                except ValueError:
-                    self.disconnect()
-                    raise
-                result.values[key] = temperature(response)
+                result.values[key] = self._read_value(command, temperature, result, cancelled)
                 if on_progress is not None:
                     on_progress(result)
             except ValueError as exc:
                 result.errors[key] = str(exc)
                 # A framed decoder error does not invalidate other datapoints.
-                if self.sock is None:
-                    break
             except (OSError, UnicodeError) as exc:
                 self.disconnect()
                 for missing in reads:

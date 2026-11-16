@@ -88,6 +88,8 @@ class FixtureServer(socketserver.ThreadingTCPServer):
                         elif command.startswith('setSystemTime '):
                             if owner.apply_setter: owner.clock_reply = command.split()[1]
                             reply = owner.setter_reply + '\nvctrld> '
+                        elif command == 'getProbePartyModeRaw':
+                            reply = '03\nvctrld> '
                         elif command == 'getProbeOutputStatus':
                             reply = owner.output_reply + '\nvctrld> '
                         elif command == 'getProbeAlarmBlockRaw':
@@ -131,6 +133,81 @@ class FixtureServer(socketserver.ThreadingTCPServer):
 
     def stop(self):
         self.shutdown(); self.server_close(); self.thread.join(2)
+
+
+class ReadRecoveryTests(unittest.TestCase):
+    def client(self):
+        from unittest.mock import Mock
+        client = Client(Settings('fixture', enabled=True))
+        client.sock = Mock()
+        def health(result, cancelled, force=False):
+            client.sock = Mock()
+            result.health_ok = True
+        client._ensure_health = Mock(side_effect=health)
+        return client
+
+    def test_transport_diagnostic_handles_non_ascii_reply_without_constructor_error(self):
+        from unittest.mock import Mock
+        client = self.client()
+        client._frame = Mock(side_effect=UnicodeDecodeError('ascii', b'\xff', 0, 1, 'invalid byte'))
+        with self.assertRaisesRegex(UnicodeError, 'Communication failure: getBoilerTemp after'):
+            client._exchange('getBoilerTemp', lambda: False)
+
+    def test_bad_reply_retries_once_on_fresh_connection_and_records_recovery(self):
+        from unittest.mock import Mock
+        client = self.client()
+        client._exchange = Mock(side_effect=['ERR: Wrong result, terminating', '27.4 C'])
+        result = Result()
+        self.assertEqual(client._read_value('getBoilerTemp', temperature, result, lambda: False), 27.4)
+        self.assertEqual(client._exchange.call_count, 2)
+        client._ensure_health.assert_called_once()
+        self.assertIn("reply='ERR: Wrong result, terminating'", result.diagnostics[0])
+        self.assertIn('vcontrold-reported error:', result.diagnostics[0])
+        self.assertIn('recovered', result.diagnostics[1])
+
+    def test_processing_errors_are_distinguished_from_daemon_errors(self):
+        from unittest.mock import Mock
+        for reply, label in [('UNKNOWN', 'vcontrold returned an unmapped value'),
+                             ('27 C extra', 'Plugin data-validation error'),
+                             ('ERR: read timeout', 'vcontrold-reported error')]:
+            client = self.client()
+            client._exchange = Mock(return_value=reply)
+            with self.assertRaisesRegex(ValueError, label):
+                client._read_value('getBoilerTemp', temperature, Result(), lambda: False)
+
+    def test_repeated_failure_stops_after_two_reads_and_retains_no_valid_value(self):
+        from unittest.mock import Mock
+        client = self.client()
+        client._exchange = Mock(side_effect=['UNKNOWN', 'UNKNOWN'])
+        result = Result()
+        with self.assertRaisesRegex(ValueError, 'attempt 2/2'):
+            client._read_value('getBoilerTemp', temperature, result, lambda: False)
+        self.assertEqual(client._exchange.call_count, 2)
+        self.assertIsNone(client.sock)
+        self.assertEqual(result.values, {})
+
+    def test_timeout_reconnects_and_cancellation_does_not_retry(self):
+        from unittest.mock import Mock
+        client = self.client()
+        client._exchange = Mock(side_effect=[TimeoutError('deadline'), '19'])
+        self.assertEqual(client._read_value('getRoomTempSP', temperature, Result(), lambda: False), 19)
+        self.assertEqual(client._exchange.call_count, 2)
+        client._exchange = Mock(side_effect=InterruptedError('cancelled'))
+        with self.assertRaises(InterruptedError):
+            client._read_value('getRoomTempSP', temperature, Result(), lambda: False)
+        self.assertEqual(client._exchange.call_count, 1)
+
+    def test_party_unknown_records_subsequent_raw_byte_without_accepting_unknown(self):
+        from unittest.mock import Mock
+        client = self.client()
+        result = Result(live_identity=True)
+        replies = {'getPartyModeA1': 'UNKNOWN', 'getProbePartyModeRaw': '03'}
+        client._exchange = Mock(side_effect=lambda command, cancelled: replies[command])
+        client._read_party(result, lambda: False)
+        self.assertIsNone(result.party_mode)
+        self.assertIn("subsequent raw byte='03'", result.party_error)
+        self.assertEqual([c.args[0] for c in client._exchange.call_args_list],
+                         ['getPartyModeA1', 'getProbePartyModeRaw'] * 2)
 
 
 class TransportTests(unittest.TestCase):
@@ -587,6 +664,15 @@ class AdapterTests(unittest.TestCase):
         self.plugin.manager.close()
         if self.previous is None: sys.modules.pop('indigo', None)
         else: sys.modules['indigo'] = self.previous
+
+    def test_health_failure_is_reported_once_instead_of_four_sensor_failures(self):
+        result = Result(errors={key: 'getSystemTime after 12.00s: deadline' for key in READS},
+                        tcp_available=True, health_error='getSystemTime after 12.00s: deadline')
+        self.plugin._publish(result)
+        for device in self.devices.values():
+            self.assertEqual(device.states['lastError'],
+                             'Controller health check: getSystemTime after 12.00s: deadline')
+            self.assertFalse(device.states['dataValid'])
 
     def test_distribution_partial_failure_and_disabled_invalidates(self):
         self.devices[1].pluginProps['pollingEnabled'] = True

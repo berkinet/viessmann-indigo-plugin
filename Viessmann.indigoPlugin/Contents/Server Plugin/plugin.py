@@ -599,6 +599,8 @@ class Plugin(indigo.PluginBase):
 
     def _publish(self, result, device_ids=None, provisional=False):
         if not provisional:
+            for diagnostic in result.diagnostics:
+                self.logger.warning('Read diagnostic: %s', diagnostic)
             self._publish_party(result)
         if result.health_only:
             self._publish_health(result)
@@ -627,6 +629,8 @@ class Plugin(indigo.PluginBase):
                 valid = valid and not result.errors and not result.release_error
             errors = [key + ': ' + message for key, message in result.errors.items()
                       if dev.deviceTypeId == 'viessmannSystem' or key in keys]
+            if result.health_error and not result.values:
+                errors = ['Controller health check: ' + result.health_error]
             if result.release_error:
                 errors.append('Link release: ' + result.release_error)
             if not result.tcp_available:
