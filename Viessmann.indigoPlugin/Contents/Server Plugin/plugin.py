@@ -23,6 +23,7 @@ class Plugin(indigo.PluginBase):
         self.pending_party_toggles = set()
         self.resync_timers = {}
         self.production_fault = False
+        self.production_alarm_code = ''
         self.fault_sampled = False
         self.fault_endpoint = None
 
@@ -470,6 +471,8 @@ class Plugin(indigo.PluginBase):
         if not result.tcp_available:
             return 'Comm Fail'
         responding = result.health_ok or bool(result.values) or result.optical_activity == 'Detected'
+        if responding and self.production_fault and self.production_alarm_code:
+            return 'Error ' + self.production_alarm_code
         if responding and self.production_fault and result.verified_active_fault_code in ('', 'Unknown'):
             return 'Production fault'
         if responding and result.verified_active_fault_code:
@@ -641,7 +644,12 @@ class Plugin(indigo.PluginBase):
             if result.production_status is not None or result.active_fault_known:
                 self.fault_sampled = True
             if result.production_status is not None:
-                self.production_fault = result.production_status['productionFault']
+                fault = result.production_status['productionFault']
+                if not fault or not self.production_fault:
+                    self.production_alarm_code = ''
+                self.production_fault = fault
+            if self.production_fault and result.alarm_code is not None:
+                self.production_alarm_code = '' if result.alarm_code == '00' else result.alarm_code
             for diagnostic in result.diagnostics:
                 self.logger.warning('Read diagnostic: %s', diagnostic)
             self._publish_party(result)
@@ -911,6 +919,7 @@ class Plugin(indigo.PluginBase):
         if endpoint != self.fault_endpoint:
             self.fault_sampled = False
             self.production_fault = False
+            self.production_alarm_code = ''
             self.established_fault = ''
             self.fault_endpoint = endpoint
         changed = settings != self.manager.settings

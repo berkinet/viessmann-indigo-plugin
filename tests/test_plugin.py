@@ -1317,6 +1317,46 @@ class AdapterTests(unittest.TestCase):
                                    production_status={'productionFault': False}))
         self.assertEqual(dev.states['status'], 'Online')
 
+    def test_acknowledged_fault_uses_current_alarm_code_and_clears_after_reset(self):
+        server = FixtureServer()
+        client = Client(server.settings())
+        dev = self.devices[1]
+        try:
+            server.production_reply = '00 00 04 00'
+            server.relay_reply = '82 60'  # Local acknowledgment cleared relay bit.
+            server.alarm_reply = server.alarm_reply[:-2] + 'D1'
+            result = client.fault(include_party=False)
+            self.assertEqual(result.alarm_code, 'D1')
+            self.assertEqual(result.verified_active_fault_code, '')
+            self.plugin._publish(result)
+            self.assertEqual(dev.states['status'], 'Error D1')
+            self.assertEqual(dev.error, 'Error D1')
+            self.assertEqual(dev.icon, 'fault')
+            self.assertFalse(dev.states['burnerOn'])
+            self.plugin._publish(Result(health_only=True, tcp_available=True, health_ok=True))
+            self.assertEqual(dev.states['status'], 'Error D1')
+            # Failed samples cannot erase a previously decoded current code.
+            server.alarm_reply = 'ERR: read failed'
+            self.plugin._publish(client.fault(include_party=False))
+            self.assertEqual(dev.states['status'], 'Error D1')
+            # Explicit no-code sample falls back to the generic production fault.
+            self.plugin._publish(Result(health_only=True, fault_only=True, tcp_available=True,
+                                       health_ok=True, active_fault_known=True, alarm_code='00'))
+            self.assertEqual(dev.states['status'], 'Production fault')
+            server.production_reply = '00 00 00 00'
+            server.alarm_reply = 'ERR: unavailable'  # Old history D1 must not relatch
+            self.plugin._publish(client.fault(include_party=False))
+            self.assertEqual(dev.states['status'], 'Online')
+            self.assertIsNone(dev.error)
+            self.assertEqual(self.plugin.production_alarm_code, '')
+            # A later new production fault cannot inherit a previous episode's code.
+            self.plugin._publish(Result(health_only=True, fault_only=True, tcp_available=True,
+                                       health_ok=True, active_fault_known=True,
+                                       production_status={'productionFault': True}))
+            self.assertEqual(dev.states['status'], 'Production fault')
+        finally:
+            client.disconnect(); server.stop()
+
     def test_production_fault_reports_before_relay_and_survives_clock_polls(self):
         flags = {'productionFault': True, 'productionHardBlock': False,
                  'productionSpecialOperation': False, 'productionStorageCharging': False}
@@ -1349,10 +1389,12 @@ class AdapterTests(unittest.TestCase):
 
     def test_fault_evidence_is_not_carried_to_a_different_endpoint(self):
         self.plugin.production_fault = True
+        self.plugin.production_alarm_code = 'D1'
         self.plugin.established_fault = 'D1'
         self.devices[1].pluginProps['host'] = 'different-pi'
         self.plugin._configure()
         self.assertFalse(self.plugin.production_fault)
+        self.assertEqual(self.plugin.production_alarm_code, '')
         self.assertEqual(self.plugin.established_fault, '')
 
     def test_optical_resync_is_informational_and_recovers_without_hiding_faults(self):

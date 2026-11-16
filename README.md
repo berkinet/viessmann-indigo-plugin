@@ -122,3 +122,7 @@ On startup, temperature/clock success displays **Awaiting fault check**, rather 
 ## Version 0.2.34 — fault-first startup
 
 The initial sampling pass checks faults before requesting temperatures, and publishes its result first. A normal temperature poll follows immediately. Awaiting fault check remains the fallback if initial fault assessment fails.
+
+## Version 0.2.35 — current alarm-code priority
+
+During an active production fault, the valid current alarm code displays **Error D1** (or the received code), even after local acknowledgment clears the relay bit. **Production fault** is the fallback when no current code is known. Fault clearance and new episodes do not inherit an old production alarm code.

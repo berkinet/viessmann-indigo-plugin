@@ -113,6 +113,7 @@ class Result:
     fault_only: bool = False
     alarm: str = ''
     alarm_raw: str = ''
+    alarm_code: str | None = None
     alarm_change_flag: bool | None = None
     alarm_content: str = ''
     fault_record: str = ''
@@ -377,6 +378,7 @@ class Client:
                 if attribute == 'alarm':
                     text = alarm_block(text)
                     raw = bytes.fromhex(result.alarm_raw)
+                    result.alarm_code = '%02X' % raw[28]
                     result.alarm_change_flag = bool(raw[14] & 0x10)
                     result.alarm_content = ','.join('%d:%02X' % (i, byte)
                                                     for i, byte in enumerate(raw) if not 16 <= i <= 22)
