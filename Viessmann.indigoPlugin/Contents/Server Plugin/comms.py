@@ -348,7 +348,7 @@ class Client:
             self._health_failure(result, exc, cancelled)
         return result
 
-    def fault(self, cancelled=lambda: False):
+    def fault(self, cancelled=lambda: False, include_party=True):
         result = Result(health_only=True, fault_only=True)
         try:
             self._ensure_health(result, cancelled)
@@ -438,7 +438,8 @@ class Client:
                 result.verified_active_fault_code = code if code and code != '00' else 'Unknown'
         if result.relay_status or result.fault_record:
             result.fault_checked = datetime.now(timezone.utc).isoformat(timespec='seconds')
-        self._read_party(result, cancelled)
+        if include_party:
+            self._read_party(result, cancelled)
         return result
 
     def _read_party(self, result, cancelled):
@@ -685,6 +686,7 @@ class Manager:
         self.startup_complete = False
         self.health_due = 0
         self.fault_due = 0
+        self.startup_fault_pending = True
 
     def configure(self, settings):
         if settings != self.settings:
@@ -695,6 +697,7 @@ class Manager:
             self.due = self.clock()
             self.health_due = self.clock()
             self.fault_due = self.clock()
+            self.startup_fault_pending = True
 
     def request_poll(self):
         # Called only by the worker; repeated queued refresh requests coalesce.
@@ -707,6 +710,12 @@ class Manager:
             return None
         if self.client is None:
             self.client = self.client_factory(self.settings)
+        if self.startup_fault_pending:
+            self.startup_fault_pending = False
+            result = self.client.fault(cancelled, include_party=False)
+            self.fault_due = self.clock() + self.settings.fault_interval
+            self.health_due = self.clock() + self.settings.health_interval
+            return result
         if not self.requested and self.clock() < self.due and self.clock() >= self.fault_due:
             result = self.client.fault(cancelled)
             self.fault_due = self.clock() + self.settings.fault_interval

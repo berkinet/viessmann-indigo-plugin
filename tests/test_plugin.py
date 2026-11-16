@@ -523,12 +523,14 @@ class SchedulingTests(unittest.TestCase):
                 self.calls = 0; self.closed = False; instances.append(self)
             def poll(self, cancelled):
                 self.calls += 1; clock[0] += 20; return Result(values=dict.fromkeys(READS, 20))
+            def fault(self, cancelled, include_party=True): return Result(health_only=True, fault_only=True)
             def disconnect(self): self.closed = True
         manager = Manager(clock=lambda: clock[0], client_factory=Fake)
         manager.configure(Settings('localhost'))
         self.assertIsNone(manager.tick())
         self.assertEqual(instances, [])
         manager.configure(Settings('localhost', enabled=True, health_interval=86400, fault_interval=86400))
+        self.assertTrue(manager.tick().fault_only)
         self.assertIsNotNone(manager.tick())
         manager.fault_due = 86400
         clock[0] = 199
@@ -537,6 +539,7 @@ class SchedulingTests(unittest.TestCase):
         self.assertIsNotNone(manager.tick())
         self.assertEqual(len(instances), 1)
         manager.configure(Settings('localhost', interval=30, enabled=True, health_interval=86400, fault_interval=86400))
+        self.assertTrue(manager.tick().fault_only)
         self.assertTrue(instances[0].closed)
         self.assertIsNotNone(manager.tick())
         manager.close()
@@ -550,9 +553,11 @@ class SchedulingTests(unittest.TestCase):
             def poll(self, cancelled):
                 clock[0] += 2
                 return Result(values=dict.fromkeys(READS, 20)) if self.good else Result()
+            def fault(self, cancelled, include_party=True): return Result(health_only=True, fault_only=True)
             def disconnect(self): pass
         manager = Manager(clock=lambda: clock[0], client_factory=Fake)
         manager.configure(Settings('localhost', enabled=True, health_interval=86400, fault_interval=86400))
+        self.assertTrue(manager.tick().fault_only)
         for attempt in range(4):
             self.assertIsNotNone(manager.tick())
             self.assertEqual(manager.due, clock[0] + (5 if attempt < 3 else 180))
@@ -567,8 +572,30 @@ class SchedulingTests(unittest.TestCase):
         manager.tick()
         self.assertEqual(manager.due, clock[0] + 180)
         manager.configure(Settings('other-host', enabled=True, health_interval=86400, fault_interval=86400))
+        self.assertTrue(manager.tick().fault_only)
         manager.tick()
         self.assertEqual(manager.due, clock[0] + 5)
+
+    def test_protocol_startup_samples_fault_before_any_temperature(self):
+        server = FixtureServer()
+        server.production_reply = '00 00 04 00'
+        server.relay_reply = '83 60'
+        manager = Manager()
+        try:
+            manager.configure(server.settings())
+            first = manager.tick()
+            self.assertTrue(first.fault_only)
+            self.assertEqual(first.verified_active_fault_code, 'D1')
+            self.assertTrue(first.production_status['productionFault'])
+            self.assertNotIn('getBoilerTemp', server.commands)
+            self.assertNotIn('getTempPartyM1', server.commands)
+            second = manager.tick()
+            self.assertIn('boilerTemp', second.values)
+            self.assertLess(server.commands.index('getProbeProductionStatus'),
+                            server.commands.index('getBoilerTemp'))
+            self.assertFalse(any(c.startswith('set') for c in server.commands))
+        finally:
+            manager.close(); server.stop()
 
     def test_health_checks_run_independently_without_starting_full_polls(self):
         clock = [0]
@@ -577,12 +604,12 @@ class SchedulingTests(unittest.TestCase):
             def __init__(self, settings): pass
             def poll(self, cancelled): calls.append('poll'); return Result(values=dict.fromkeys(READS, 20), health_ok=True)
             def health(self, cancelled): calls.append('health'); return Result(health_only=True, health_ok=True)
-            def fault(self, cancelled): calls.append('fault'); return Result(health_only=True, fault_only=True, health_ok=True)
+            def fault(self, cancelled, include_party=True): calls.append('fault'); return Result(health_only=True, fault_only=True, health_ok=True)
             def disconnect(self): calls.append('disconnect')
         manager = Manager(clock=lambda: clock[0], client_factory=Fake)
         manager.configure(Settings('localhost', enabled=True, interval=180, health_interval=30, fault_interval=90))
-        manager.tick()
         self.assertTrue(manager.tick().fault_only)
+        manager.tick()
         clock[0] = 29
         self.assertIsNone(manager.tick())
         clock[0] = 30
@@ -592,7 +619,7 @@ class SchedulingTests(unittest.TestCase):
         manager.tick()
         clock[0] = 180
         manager.tick()
-        self.assertEqual(calls, ['poll', 'fault', 'health', 'health', 'poll'])
+        self.assertEqual(calls, ['fault', 'poll', 'health', 'health', 'poll'])
         manager.configure(Settings('localhost', enabled=False))
         clock[0] = 1000
         self.assertIsNone(manager.tick())
@@ -602,10 +629,13 @@ class SchedulingTests(unittest.TestCase):
         class Fake:
             def __init__(self, settings): pass
             def poll(self, cancelled): calls.append(1); return Result()
+            def fault(self, cancelled, include_party=True): return Result(health_only=True, fault_only=True)
             def disconnect(self): pass
         manager = Manager(clock=lambda: 100, client_factory=Fake)
         manager.configure(Settings('localhost', enabled=False))
         manager.request_poll(); manager.request_poll()
+        self.assertTrue(manager.tick().fault_only)
+        self.assertEqual(len(calls), 0)
         self.assertIsNotNone(manager.tick())
         self.assertEqual(len(calls), 1)
         self.assertIsNone(manager.tick())

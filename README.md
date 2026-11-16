@@ -118,3 +118,7 @@ A successfully decoded production fault now sets the system display to **Product
 ## Version 0.2.33 — await initial fault assessment
 
 On startup, temperature/clock success displays **Awaiting fault check**, rather than **Online**, until the first successful production/relay fault assessment. Existing D1 faults are then displayed when sampled; a failed assessment does not imply a clear controller.
+
+## Version 0.2.34 — fault-first startup
+
+The initial sampling pass checks faults before requesting temperatures, and publishes its result first. A normal temperature poll follows immediately. Awaiting fault check remains the fallback if initial fault assessment fails.

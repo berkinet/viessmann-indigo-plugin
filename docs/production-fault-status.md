@@ -13,3 +13,9 @@ Offline tests cover early production indication, clock/full-poll persistence, fa
 Owner observed Online after installing 0.2.32 while D1 remained active. Event log: restart at 18:01:56 CET, first temperatures published Online at 18:02:20, first completed fault sample published Error D1 at 18:02:48. An unmapped party read/retry extended that sample. This was an initial-assessment gap, not a valid clear sample.
 
 After startup or an endpoint change, successful communication displays Awaiting fault check until a production-status decode or relay-based active/clear assessment succeeds. This informational startup state has no device error flag. Failed fault samples do not complete assessment; explicit fault evidence is displayed immediately. Once assessed, ordinary Online/fault/recovery behavior resumes. Child temperatures remain available independently. Tests reproduce temperatures -> failed fault sample -> production fault -> D1 -> confirmed clear.
+
+## 0.2.34 — fault-first startup
+
+Initial manager work now samples clock/identity and fault registers before any temperature polling. The initial fault work item omits party-mode/target reads so those cannot delay fault publication. The full temperature poll remains due immediately afterward, with the same shared connection owner. Regular sampling and write rules are unchanged. If the initial assessment fails, Awaiting fault check remains the fallback while responding; ordinary communication failure rules still apply.
+
+The TCP fixture regression reproduces productionFault=true/relay D1, verifies no temperature commands in the first pass, then verifies the following temperature poll. This is synthetic protocol verification, not a live boiler restart test. Owner installs the release while D1 remains active for live confirmation.
