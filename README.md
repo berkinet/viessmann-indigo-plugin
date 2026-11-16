@@ -106,3 +106,7 @@ Failed full-poll temperature and periodic party reads get one retry on a fresh c
 ## Version 0.2.30 — optical resync status
 
 After a failed health exchange, detected optical activity displays **Resync optical link** without Indigo's device error flag. Diagnostics and invalid-reading flags remain available. Known controller faults retain priority; a successful exchange restores Online.
+
+## Version 0.2.31 — bounded optical resync grace
+
+**Resync optical link** stays informational for one minute. If recovery is still outstanding, it changes to **Pending** with the device error flag. Repeated failures do not restart that timer; successful communication clears it.

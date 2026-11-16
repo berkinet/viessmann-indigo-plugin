@@ -21,6 +21,7 @@ class Plugin(indigo.PluginBase):
         self.state_images = {}
         self.burner_inconsistencies = set()
         self.pending_party_toggles = set()
+        self.resync_timers = {}
 
     def startup(self):
         indigo.variables.subscribeToChanges()
@@ -111,6 +112,10 @@ class Plugin(indigo.PluginBase):
         return 'status' if dev.deviceTypeId == 'viessmannSystem' else 'temperatureInputsAll'
 
     def deviceStopComm(self, dev):
+        with self.pending_lock:
+            entry = self.resync_timers.pop(dev.id, None)
+            if entry:
+                entry['timer'].cancel()
         self.events.put(('stop', dev.id))
 
     def _native_capabilities(self, dev, simulator, writable):
@@ -290,12 +295,42 @@ class Plugin(indigo.PluginBase):
             dev.updateStatesOnServer([{'key': 'status', 'value': pending['status']}])
             dev.setErrorStateOnServer(pending['error'])
 
+    def _expire_resync(self, device_id, entry):
+        # Separate timer: a slow optical read must not extend the grace period.
+        with self.pending_lock:
+            if (self.closing.is_set() or self.resync_timers.get(device_id) is not entry
+                    or device_id not in self.active):
+                return
+            dev = self._device(device_id)
+            if dev is None:
+                return
+            entry['expired'] = True
+            self._publish_states(dev, [{'key': 'status', 'value': 'Resync optical link'}], None)
+
     def _publish_states(self, dev, updates, display_error):
         if dev.deviceTypeId == 'viessmannSystem':
             states = dict(dev.states)
             states.update({item['key']: item['value'] for item in updates})
             updates = list(updates) + self._burner_state_updates(states)
         with self.pending_lock:
+            status_update = next((u for u in updates if u['key'] == 'status'), None)
+            if status_update is not None:
+                status = status_update['value'].removeprefix('SIMULATOR · ')
+                entry = self.resync_timers.get(dev.id)
+                if status == 'Resync optical link' and not self.closing.is_set():
+                    if entry is None:
+                        entry = {'expired': False}
+                        timer = threading.Timer(60, self._expire_resync, args=(dev.id, entry))
+                        timer.daemon = True
+                        entry['timer'] = timer
+                        self.resync_timers[dev.id] = entry
+                        timer.start()
+                    if entry['expired']:
+                        status_update['value'] = status_update['value'].replace('Resync optical link', 'Pending')
+                        display_error = 'Pending'
+                elif entry is not None:
+                    entry['timer'].cancel()
+                    self.resync_timers.pop(dev.id, None)
             pending = self.pending_sets.get(dev.id)
             if pending:
                 for update in updates:
@@ -898,3 +933,7 @@ class Plugin(indigo.PluginBase):
 
     def stopConcurrentThread(self):
         self.closing.set()
+        with self.pending_lock:
+            for entry in self.resync_timers.values():
+                entry['timer'].cancel()
+            self.resync_timers.clear()

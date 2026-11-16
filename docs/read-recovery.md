@@ -17,3 +17,7 @@ Tests retain existing TCP framing, cancellation, write rejection/readback and li
 ## 0.2.30 — informational optical resync
 
 A failed controller-health exchange with a fresh detected optical activity probe now displays **Resync optical link**, without setting Indigo's device error flag. This applies to health-only system updates and full-poll device updates. Health/reading validity remains false and diagnostic errors remain available; retained values are not revalidated. A successful health exchange restores Online. Detected activity without a failed health exchange retains Pending. Known controller faults retain priority and their error flag; absent TCP or absent optical activity retains the existing failure behavior. Resync describes the recovery path, not a guarantee that recovery will succeed.
+
+## 0.2.31 — one-minute resync grace
+
+Resync optical link now has a 60-second grace period per affected device. A separate timer expires it to Pending and sets the Indigo device error flag even if the communications worker is waiting in a read. Repeated failed exchanges in the same episode do not extend/restart the grace period. A successful relevant update or another definitive status cancels the timer; a new later resync episode gets a new grace period. Device stop and plugin shutdown cancel timers. Already-established boiler faults retain priority.

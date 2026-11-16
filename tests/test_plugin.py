@@ -661,6 +661,7 @@ class AdapterTests(unittest.TestCase):
         self.plugin._process_events(); self.plugin._configure()
 
     def tearDown(self):
+        self.plugin.stopConcurrentThread()
         self.plugin.manager.close()
         if self.previous is None: sys.modules.pop('indigo', None)
         else: sys.modules['indigo'] = self.previous
@@ -1235,6 +1236,34 @@ class AdapterTests(unittest.TestCase):
         self.plugin.actionControlUniversal(types.SimpleNamespace(deviceAction=1), self.devices[3])
         self.plugin._process_events()
         self.assertFalse(self.plugin.manager.requested)
+
+    def test_resync_grace_expires_without_another_poll_and_does_not_restart(self):
+        from unittest.mock import patch, Mock
+        with patch.object(sys.modules['threading'], 'Timer') as timer:
+            timer.return_value = Mock()
+            result = Result(health_only=True, tcp_available=True, health_error='clock failed',
+                            optical_activity='Detected')
+            self.plugin._publish(result)
+            entry = self.plugin.resync_timers[1]
+            self.assertEqual(timer.call_args.args[0], 60)
+            self.plugin._publish(result)
+            self.assertEqual(timer.call_count, 1)
+            self.plugin._expire_resync(1, entry)
+            self.assertEqual(self.devices[1].states['status'], 'Pending')
+            self.assertEqual(self.devices[1].error, 'Pending')
+            self.plugin._publish(result)
+            self.assertEqual(timer.call_count, 1)
+            self.assertEqual(self.devices[1].error, 'Pending')
+            self.plugin._publish(Result(health_only=True, tcp_available=True, health_ok=True))
+            self.assertNotIn(1, self.plugin.resync_timers)
+            self.assertIsNone(self.devices[1].error)
+            # A late callback from the cancelled timer cannot overwrite recovery.
+            self.plugin._expire_resync(1, entry)
+            self.assertEqual(self.devices[1].states['status'], 'Online')
+            self.plugin._publish(result)
+            self.assertEqual(timer.call_count, 2)
+            self.plugin.deviceStopComm(self.devices[1])
+            self.assertNotIn(1, self.plugin.resync_timers)
 
     def test_optical_resync_is_informational_and_recovers_without_hiding_faults(self):
         self.plugin._publish(Result(values=readings(66, -3, 20, 46), tcp_available=True))
