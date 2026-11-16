@@ -439,7 +439,7 @@ class Plugin(indigo.PluginBase):
         if result.health_ok or result.values:
             return 'Online'
         if result.optical_activity == 'Detected':
-            return 'Pending'
+            return 'Resync optical link' if result.health_error else 'Pending'
         return 'System Off'
 
     def _health_updates(self, result):
@@ -472,7 +472,7 @@ class Plugin(indigo.PluginBase):
             return
         if result.active_fault_known or result.verified_active_fault_code:
             self.established_fault = result.verified_active_fault_code
-        if result.health_ok and self.established_fault:
+        if (result.health_ok or result.optical_activity == 'Detected') and self.established_fault:
             result.verified_active_fault_code = self.established_fault
         status = self._system_status(result)
         if result.simulator:
@@ -532,7 +532,7 @@ class Plugin(indigo.PluginBase):
                 updates.append({'key': 'relayStatusRaw', 'value': result.relay_status})
             if result.fault_checked:
                 updates.append({'key': 'lastFaultCheck', 'value': result.fault_checked})
-        self._publish_states(dev, updates, None if self._system_status(result) == 'Online' else self._system_status(result))
+        self._publish_states(dev, updates, None if self._system_status(result) in ('Online', 'Resync optical link') else self._system_status(result))
 
     def _publish_progress(self, result, published):
         if self.closing.is_set() or not self.events.empty():
@@ -636,13 +636,13 @@ class Plugin(indigo.PluginBase):
             if not result.tcp_available:
                 failure = 'Connect failed'
             elif result.optical_activity == 'Detected':
-                failure = 'Pending'
+                failure = 'Resync optical link' if result.health_error else 'Pending'
             else:
                 failure = 'Read failed'
             # System connectivity is independent of snapshot completeness.
             online = valid or (dev.deviceTypeId == 'viessmannSystem' and bool(result.values))
             status = self._system_status(result) if dev.deviceTypeId == 'viessmannSystem' else ('Online' if online else failure)
-            display_error = None if status == 'Online' else status
+            display_error = None if status in ('Online', 'Resync optical link') else status
             updates = [{'key': 'simulator', 'value': result.simulator}, {'key': 'lastAttempt', 'value': stamp},
                        {'key': 'dataValid', 'value': valid},
                        {'key': 'status', 'value': status},

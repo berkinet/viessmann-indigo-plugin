@@ -1236,6 +1236,34 @@ class AdapterTests(unittest.TestCase):
         self.plugin._process_events()
         self.assertFalse(self.plugin.manager.requested)
 
+    def test_optical_resync_is_informational_and_recovers_without_hiding_faults(self):
+        self.plugin._publish(Result(values=readings(66, -3, 20, 46), tcp_available=True))
+        old_boiler = self.devices[1].states['boilerTemp']
+        failed = Result(tcp_available=True, health_error='getSystemTime deadline',
+                        optical_activity='Detected', optical_checked=True,
+                        errors={key: 'clock failed' for key in READS})
+        self.plugin._publish(failed)
+        for dev in self.devices.values():
+            self.assertEqual(dev.states['status'], 'Resync optical link')
+            self.assertIsNone(dev.error)
+            self.assertFalse(dev.states['dataValid'])
+        self.assertEqual(self.devices[1].states['boilerTemp'], old_boiler)
+        self.assertFalse(self.devices[1].states['healthValid'])
+        self.assertIn('deadline', self.devices[1].states['healthError'])
+        self.plugin._publish(Result(health_only=True, tcp_available=True,
+                                   health_error='clock failed', optical_activity='Detected'))
+        self.assertEqual(self.devices[1].states['status'], 'Resync optical link')
+        self.assertIsNone(self.devices[1].error)
+        self.plugin._publish(Result(health_only=True, tcp_available=True, health_ok=True))
+        self.assertEqual(self.devices[1].states['status'], 'Online')
+        self.assertIsNone(self.devices[1].error)
+        # A known controller fault takes precedence over informational resync.
+        self.plugin.established_fault = 'D1'
+        self.plugin._publish(Result(health_only=True, tcp_available=True,
+                                   health_error='clock failed', optical_activity='Detected'))
+        self.assertEqual(self.devices[1].states['status'], 'Error D1')
+        self.assertEqual(self.devices[1].error, 'Error D1')
+
     def test_activity_detection_does_not_imply_valid_data_or_online(self):
         self.plugin._publish(Result(errors={'roomMeasuredTemp': 'timeout'}, tcp_available=True,
                                     optical_activity='Detected', optical_checked=True))

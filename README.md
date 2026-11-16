@@ -102,3 +102,7 @@ track the party target even when mode is Off. See docs/clock-party-actions.md.
 ## Version 0.2.29 — read recovery and diagnostic sources
 
 Failed full-poll temperature and periodic party reads get one retry on a fresh connection. Logs distinguish daemon-reported errors, transport failures, unmapped responses and plugin validation failures, retaining command/reply/timing evidence. Full-poll health failures appear once rather than as four sensor failures. A raw party-mode getter supports mapping investigations. Writes are never automatically retried. See [read diagnostics](docs/read-recovery.md).
+
+## Version 0.2.30 — optical resync status
+
+After a failed health exchange, detected optical activity displays **Resync optical link** without Indigo's device error flag. Diagnostics and invalid-reading flags remain available. Known controller faults retain priority; a successful exchange restores Online.
