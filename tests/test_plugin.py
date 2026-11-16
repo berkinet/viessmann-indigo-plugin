@@ -822,7 +822,7 @@ class AdapterTests(unittest.TestCase):
         self.assertTrue(dev.states['burnerOnValid'])
         self.assertEqual(dev.states['burnerOutput'], 100)
         self.assertTrue(dev.states['burnerActive'])
-        self.assertEqual(dev.icon, 'idle')
+        self.assertEqual(dev.icon, 'fault')
         self.assertTrue(dev.states['alarmChangeFlag'])
         self.plugin._publish(sample(True, change=False))
         self.assertFalse(dev.states['alarmChangeFlag'])
@@ -843,7 +843,7 @@ class AdapterTests(unittest.TestCase):
         self.plugin._publish(Result(health_only=True, health_ok=False))
         self.assertFalse(dev.states['burnerOnValid'])
 
-    def test_production_flags_retain_values_on_failure_and_do_not_override_fault_display(self):
+    def test_production_flags_retain_values_and_fault_display_on_failure(self):
         dev = self.devices[1]
         self.plugin._publish(Result(health_only=True, fault_only=True, health_ok=True, tcp_available=True,
                                     production_status={'productionFault': True, 'productionHardBlock': False,
@@ -851,7 +851,7 @@ class AdapterTests(unittest.TestCase):
                                     production_status_raw='00 02 04 00', production_status_checked='2026-11-14T12:00:00+00:00'))
         self.assertTrue(dev.states['productionFault'])
         self.assertTrue(dev.states['productionStatusValid'])
-        self.assertEqual(dev.states['status'], 'Online')
+        self.assertEqual(dev.states['status'], 'Production fault')
         self.plugin._publish(Result(health_only=True, fault_only=True, health_ok=True, tcp_available=True,
                                     production_status_raw='FF FF FF FF', production_status_error='unavailable'))
         self.assertFalse(dev.states['productionStatusValid'])
@@ -1264,6 +1264,44 @@ class AdapterTests(unittest.TestCase):
             self.assertEqual(timer.call_count, 2)
             self.plugin.deviceStopComm(self.devices[1])
             self.assertNotIn(1, self.plugin.resync_timers)
+
+    def test_production_fault_reports_before_relay_and_survives_clock_polls(self):
+        flags = {'productionFault': True, 'productionHardBlock': False,
+                 'productionSpecialOperation': False, 'productionStorageCharging': False}
+        self.plugin._publish(Result(health_only=True, fault_only=True, tcp_available=True,
+                                   health_ok=True, active_fault_known=True,
+                                   fault_record='old historical D1', production_status=flags,
+                                   burner_output=100, burner_status='01'))
+        dev = self.devices[1]
+        self.assertEqual(dev.states['status'], 'Production fault')
+        self.assertEqual(dev.error, 'Production fault')
+        self.assertEqual(dev.icon, 'fault')
+        self.assertFalse(dev.states['burnerOn'])
+        self.assertEqual(self.plugin.established_fault, '')
+        self.plugin._publish(Result(health_only=True, tcp_available=True, health_ok=True))
+        self.assertEqual(dev.states['status'], 'Production fault')
+        self.plugin._publish(Result(values=readings(60, 12, 22, 50), tcp_available=True, health_ok=True))
+        self.assertEqual(dev.states['status'], 'Production fault')
+        self.plugin._publish(Result(health_only=True, fault_only=True, tcp_available=True,
+                                   health_ok=True, production_status_error='unavailable'))
+        self.assertEqual(dev.states['status'], 'Production fault')
+        self.assertFalse(dev.states['productionStatusValid'])
+        self.plugin._publish(Result(health_only=True, fault_only=True, tcp_available=True,
+                                   health_ok=True, active_fault_known=True, verified_active_fault_code='D1'))
+        self.assertEqual(dev.states['status'], 'Error D1')
+        self.plugin._publish(Result(health_only=True, fault_only=True, tcp_available=True,
+                                   health_ok=True, active_fault_known=True,
+                                   production_status=dict(flags, productionFault=False)))
+        self.assertEqual(dev.states['status'], 'Online')
+        self.assertIsNone(dev.error)
+
+    def test_fault_evidence_is_not_carried_to_a_different_endpoint(self):
+        self.plugin.production_fault = True
+        self.plugin.established_fault = 'D1'
+        self.devices[1].pluginProps['host'] = 'different-pi'
+        self.plugin._configure()
+        self.assertFalse(self.plugin.production_fault)
+        self.assertEqual(self.plugin.established_fault, '')
 
     def test_optical_resync_is_informational_and_recovers_without_hiding_faults(self):
         self.plugin._publish(Result(values=readings(66, -3, 20, 46), tcp_available=True))

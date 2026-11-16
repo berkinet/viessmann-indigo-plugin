@@ -22,6 +22,8 @@ class Plugin(indigo.PluginBase):
         self.burner_inconsistencies = set()
         self.pending_party_toggles = set()
         self.resync_timers = {}
+        self.production_fault = False
+        self.fault_endpoint = None
 
     def startup(self):
         indigo.variables.subscribeToChanges()
@@ -97,7 +99,7 @@ class Plugin(indigo.PluginBase):
                     self.burner_inconsistencies.discard(dev.id)
         if dev.deviceTypeId != 'viessmannSystem':
             selector = indigo.kStateImageSel.TemperatureSensor
-        elif str(states.get('status', '')).startswith(('Error ', 'SIMULATOR · Error ')):
+        elif str(states.get('status', '')).startswith(('Error ', 'SIMULATOR · Error ', 'Production fault', 'SIMULATOR · Production fault')):
             selector = indigo.kStateImageSel.SensorTripped
         elif not states.get('burnerOnValid', False):
             selector = indigo.kStateImageSel.SensorOff
@@ -463,11 +465,12 @@ class Plugin(indigo.PluginBase):
                             {'key': 'opticalActivityError', 'value': reason}])
         self._publish_states(dev, updates, reason)
 
-    @staticmethod
-    def _system_status(result):
+    def _system_status(self, result):
         if not result.tcp_available:
             return 'Comm Fail'
         responding = result.health_ok or bool(result.values) or result.optical_activity == 'Detected'
+        if responding and self.production_fault and result.verified_active_fault_code in ('', 'Unknown'):
+            return 'Production fault'
         if responding and result.verified_active_fault_code:
             return ('Error (code unavailable)' if result.verified_active_fault_code == 'Unknown'
                     else 'Error ' + result.verified_active_fault_code)
@@ -634,6 +637,8 @@ class Plugin(indigo.PluginBase):
 
     def _publish(self, result, device_ids=None, provisional=False):
         if not provisional:
+            if result.production_status is not None:
+                self.production_fault = result.production_status['productionFault']
             for diagnostic in result.diagnostics:
                 self.logger.warning('Read diagnostic: %s', diagnostic)
             self._publish_party(result)
@@ -899,6 +904,11 @@ class Plugin(indigo.PluginBase):
                 for dev in devices:
                     self._unavailable(dev, 'Invalid selected room target')
                 return
+        endpoint = (system.id, settings.host, settings.port)
+        if endpoint != self.fault_endpoint:
+            self.production_fault = False
+            self.established_fault = ''
+            self.fault_endpoint = endpoint
         changed = settings != self.manager.settings
         self.manager.configure(settings)
         for dev in devices:

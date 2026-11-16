@@ -110,3 +110,7 @@ After a failed health exchange, detected optical activity displays **Resync opti
 ## Version 0.2.31 — bounded optical resync grace
 
 **Resync optical link** stays informational for one minute. If recovery is still outstanding, it changes to **Pending** with the device error flag. Repeated failures do not restart that timer; successful communication clears it.
+
+## Version 0.2.32 — immediate production-fault status
+
+A successfully decoded production fault now sets the system display to **Production fault**, with Indigo's device error flag and fault icon, even before relay-based fault identification arrives. Current verified fault codes retain priority (for example **Error D1**). Ordinary clock/temperature polls and failed production reads do not clear confirmed fault evidence. No historical error code is assigned solely because productionFault is true.
