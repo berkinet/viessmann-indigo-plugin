@@ -114,3 +114,7 @@ After a failed health exchange, detected optical activity displays **Resync opti
 ## Version 0.2.32 — immediate production-fault status
 
 A successfully decoded production fault now sets the system display to **Production fault**, with Indigo's device error flag and fault icon, even before relay-based fault identification arrives. Current verified fault codes retain priority (for example **Error D1**). Ordinary clock/temperature polls and failed production reads do not clear confirmed fault evidence. No historical error code is assigned solely because productionFault is true.
+
+## Version 0.2.33 — await initial fault assessment
+
+On startup, temperature/clock success displays **Awaiting fault check**, rather than **Online**, until the first successful production/relay fault assessment. Existing D1 faults are then displayed when sampled; a failed assessment does not imply a clear controller.

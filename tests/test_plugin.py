@@ -659,6 +659,7 @@ class AdapterTests(unittest.TestCase):
                   Device(3, 'viessmannWaterHeater', {'systemId': '1'})):
             self.devices[d.id] = d; self.plugin.deviceStartComm(d)
         self.plugin._process_events(); self.plugin._configure()
+        self.plugin.fault_sampled = True  # Existing tests start after initial fault assessment.
 
     def tearDown(self):
         self.plugin.stopConcurrentThread()
@@ -1264,6 +1265,27 @@ class AdapterTests(unittest.TestCase):
             self.assertEqual(timer.call_count, 2)
             self.plugin.deviceStopComm(self.devices[1])
             self.assertNotIn(1, self.plugin.resync_timers)
+
+    def test_startup_does_not_report_online_before_fault_assessment(self):
+        self.plugin.fault_sampled = False
+        dev = self.devices[1]
+        self.plugin._publish(Result(values=readings(60, 12, 22, 50), tcp_available=True, health_ok=True))
+        self.assertEqual(dev.states['status'], 'Awaiting fault check')
+        self.assertIsNone(dev.error)
+        self.plugin._publish(Result(health_only=True, fault_only=True, tcp_available=True,
+                                   health_ok=True, fault_error='unavailable'))
+        self.assertEqual(dev.states['status'], 'Awaiting fault check')
+        self.plugin._publish(Result(health_only=True, fault_only=True, tcp_available=True,
+                                   health_ok=True, production_status={'productionFault': True}))
+        self.assertEqual(dev.states['status'], 'Production fault')
+        self.assertEqual(dev.error, 'Production fault')
+        self.plugin._publish(Result(health_only=True, fault_only=True, tcp_available=True,
+                                   health_ok=True, active_fault_known=True, verified_active_fault_code='D1'))
+        self.assertEqual(dev.states['status'], 'Error D1')
+        self.plugin._publish(Result(health_only=True, fault_only=True, tcp_available=True,
+                                   health_ok=True, active_fault_known=True,
+                                   production_status={'productionFault': False}))
+        self.assertEqual(dev.states['status'], 'Online')
 
     def test_production_fault_reports_before_relay_and_survives_clock_polls(self):
         flags = {'productionFault': True, 'productionHardBlock': False,

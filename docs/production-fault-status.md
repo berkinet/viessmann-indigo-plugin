@@ -7,3 +7,9 @@ System status now reports Production fault whenever the last successfully decode
 Retain this evidence across ordinary clock/full-temperature samples and failed production reads; only a valid later production clear resets the production latch. Relay-based established codes retain their existing explicit-clear behavior. Changing controller identity by system device/host/port discards both cached fault interpretations. Communication absence retains the existing Comm Fail/System Off precedence. Diagnostics and validity flags remain independent of retained fault evidence.
 
 Offline tests cover early production indication, clock/full-poll persistence, failed production sampling, upgrade to verified D1, successful clear, fault icon/error flag, and endpoint isolation. Earlier assertions that a production fault remained Online/idle have been updated to the new requirement. No boiler commands or local plugin installation were performed for this release.
+
+## 0.2.33 — initial fault assessment
+
+Owner observed Online after installing 0.2.32 while D1 remained active. Event log: restart at 18:01:56 CET, first temperatures published Online at 18:02:20, first completed fault sample published Error D1 at 18:02:48. An unmapped party read/retry extended that sample. This was an initial-assessment gap, not a valid clear sample.
+
+After startup or an endpoint change, successful communication displays Awaiting fault check until a production-status decode or relay-based active/clear assessment succeeds. This informational startup state has no device error flag. Failed fault samples do not complete assessment; explicit fault evidence is displayed immediately. Once assessed, ordinary Online/fault/recovery behavior resumes. Child temperatures remain available independently. Tests reproduce temperatures -> failed fault sample -> production fault -> D1 -> confirmed clear.

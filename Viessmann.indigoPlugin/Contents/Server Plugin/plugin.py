@@ -23,6 +23,7 @@ class Plugin(indigo.PluginBase):
         self.pending_party_toggles = set()
         self.resync_timers = {}
         self.production_fault = False
+        self.fault_sampled = False
         self.fault_endpoint = None
 
     def startup(self):
@@ -475,7 +476,7 @@ class Plugin(indigo.PluginBase):
             return ('Error (code unavailable)' if result.verified_active_fault_code == 'Unknown'
                     else 'Error ' + result.verified_active_fault_code)
         if result.health_ok or result.values:
-            return 'Online'
+            return 'Online' if self.fault_sampled else 'Awaiting fault check'
         if result.optical_activity == 'Detected':
             return 'Resync optical link' if result.health_error else 'Pending'
         return 'System Off'
@@ -570,7 +571,7 @@ class Plugin(indigo.PluginBase):
                 updates.append({'key': 'relayStatusRaw', 'value': result.relay_status})
             if result.fault_checked:
                 updates.append({'key': 'lastFaultCheck', 'value': result.fault_checked})
-        self._publish_states(dev, updates, None if self._system_status(result) in ('Online', 'Resync optical link') else self._system_status(result))
+        self._publish_states(dev, updates, None if self._system_status(result) in ('Online', 'Resync optical link', 'Awaiting fault check') else self._system_status(result))
 
     def _publish_progress(self, result, published):
         if self.closing.is_set() or not self.events.empty():
@@ -637,6 +638,8 @@ class Plugin(indigo.PluginBase):
 
     def _publish(self, result, device_ids=None, provisional=False):
         if not provisional:
+            if result.production_status is not None or result.active_fault_known:
+                self.fault_sampled = True
             if result.production_status is not None:
                 self.production_fault = result.production_status['productionFault']
             for diagnostic in result.diagnostics:
@@ -682,7 +685,7 @@ class Plugin(indigo.PluginBase):
             # System connectivity is independent of snapshot completeness.
             online = valid or (dev.deviceTypeId == 'viessmannSystem' and bool(result.values))
             status = self._system_status(result) if dev.deviceTypeId == 'viessmannSystem' else ('Online' if online else failure)
-            display_error = None if status in ('Online', 'Resync optical link') else status
+            display_error = None if status in ('Online', 'Resync optical link', 'Awaiting fault check') else status
             updates = [{'key': 'simulator', 'value': result.simulator}, {'key': 'lastAttempt', 'value': stamp},
                        {'key': 'dataValid', 'value': valid},
                        {'key': 'status', 'value': status},
@@ -906,6 +909,7 @@ class Plugin(indigo.PluginBase):
                 return
         endpoint = (system.id, settings.host, settings.port)
         if endpoint != self.fault_endpoint:
+            self.fault_sampled = False
             self.production_fault = False
             self.established_fault = ''
             self.fault_endpoint = endpoint
