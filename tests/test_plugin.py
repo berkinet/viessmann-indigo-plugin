@@ -89,7 +89,7 @@ class FixtureServer(socketserver.ThreadingTCPServer):
                             if owner.apply_setter: owner.clock_reply = command.split()[1]
                             reply = owner.setter_reply + '\nvctrld> '
                         elif command == 'getProbePartyModeRaw':
-                            reply = '03\nvctrld> '
+                            reply = (('0' + owner.party_mode) if owner.party_mode in ('0', '1') else owner.party_mode) + '\nvctrld> '
                         elif command == 'getProbeOutputStatus':
                             reply = owner.output_reply + '\nvctrld> '
                         elif command == 'getProbeAlarmBlockRaw':
@@ -167,8 +167,8 @@ class ReadRecoveryTests(unittest.TestCase):
 
     def test_processing_errors_are_distinguished_from_daemon_errors(self):
         from unittest.mock import Mock
-        for reply, label in [('UNKNOWN', 'vcontrold returned an unmapped value'),
-                             ('27 C extra', 'Plugin data-validation error'),
+        for reply, label in [('UNKNOWN', 'vcontrold returned UNKNOWN'),
+                             ('27 C extra', 'Received-data validation failure'),
                              ('ERR: read timeout', 'vcontrold-reported error')]:
             client = self.client()
             client._exchange = Mock(return_value=reply)
@@ -197,20 +197,77 @@ class ReadRecoveryTests(unittest.TestCase):
             client._read_value('getRoomTempSP', temperature, Result(), lambda: False)
         self.assertEqual(client._exchange.call_count, 1)
 
-    def test_party_unknown_records_subsequent_raw_byte_without_accepting_unknown(self):
+    def test_party_raw_sync_byte_is_rejected_and_logged_without_second_probe(self):
         from unittest.mock import Mock
         client = self.client()
         result = Result(live_identity=True)
-        replies = {'getPartyModeA1': 'UNKNOWN', 'getProbePartyModeRaw': '03'}
-        client._exchange = Mock(side_effect=lambda command, cancelled: replies[command])
+        client._exchange = Mock(return_value='05')
         client._read_party(result, lambda: False)
         self.assertIsNone(result.party_mode)
-        self.assertIn("subsequent raw byte='03'", result.party_error)
+        self.assertIn("Suspect synchronization byte: '05'", result.party_error)
+        self.assertIn('Suspect optical protocol data', result.party_error)
         self.assertEqual([c.args[0] for c in client._exchange.call_args_list],
-                         ['getPartyModeA1', 'getProbePartyModeRaw'] * 2)
+                         ['getProbePartyModeRaw'] * 2)
 
 
 class TransportTests(unittest.TestCase):
+    def test_completed_empty_activity_probe_is_distinct_from_failed_probe(self):
+        server = FixtureServer()
+        server.clock_reply = 'UNKNOWN'
+        server.activity_reply = ''
+        client = Client(server.settings())
+        try:
+            result = client.health()
+            self.assertTrue(result.optical_checked)
+            self.assertEqual(result.optical_activity, 'Not detected')
+            self.assertIn('Completed', result.optical_error)
+        finally:
+            client.disconnect(); server.stop()
+
+    def test_delayed_holiday_reply_cannot_be_reused_as_next_health_reply(self):
+        class Delayed(str):
+            def __add__(self, other):
+                time.sleep(1.3)
+                return str(self) + other
+        server = FixtureServer()
+        server.holidays['getHolidayStart'] = Delayed(server.holidays['getHolidayStart'])
+        client = Client(server.settings(timeout=1, activity_probe=False))
+        try:
+            result = client.poll()
+            self.assertIn('deadline', result.holiday_error)
+            self.assertIsNone(client.sock)
+            self.assertEqual(client.buffer, b'')
+            health = client.health()
+            self.assertTrue(health.health_ok, health.health_error)
+            self.assertEqual(server.connections, 2)
+        finally:
+            client.disconnect(); server.stop()
+
+    def test_misaligned_identity_is_rejected_before_clock_request(self):
+        server = FixtureServer()
+        server.identity = '1970-01-01T00:00:00+0000'
+        client = Client(server.settings(activity_probe=False))
+        try:
+            result = client.health()
+            self.assertIn('Invalid vcontrold device identity', result.health_error)
+            self.assertNotIn('getSystemTime', server.commands)
+            self.assertIsNone(client.sock)
+        finally:
+            client.disconnect(); server.stop()
+
+    def test_failed_greeting_is_tcp_available_but_not_optical_power_evidence(self):
+        from unittest.mock import patch, Mock
+        client = Client(Settings('fixture', enabled=True, activity_probe=False))
+        sock = Mock()
+        with patch('comms.socket.create_connection', return_value=sock):
+            with patch.object(client, '_frame', side_effect=TimeoutError('greeting deadline')):
+                result = client.health()
+        self.assertTrue(result.tcp_available)
+        self.assertFalse(result.optical_checked)
+        self.assertIn('greeting deadline', result.health_error)
+        self.assertIsNone(client.sock)
+        sock.close.assert_called_once()
+
     def test_persistent_socket_and_optical_ownership_without_per_cycle_close(self):
         server = FixtureServer()
         client = Client(server.settings())
@@ -249,7 +306,7 @@ class TransportTests(unittest.TestCase):
         client = Client(server.settings())
         try:
             result = client.poll()
-            self.assertEqual(result.optical_activity, 'Not detected')
+            self.assertEqual(result.optical_activity, 'Unavailable')
             self.assertIn('disconnected', result.optical_error)
             self.assertFalse(result.values)
             self.assertIsNone(client.sock)
@@ -1444,7 +1501,8 @@ class AdapterTests(unittest.TestCase):
                                             optical_activity=activity, optical_checked=True))
                 for dev in self.devices.values():
                     expected = ('Pending' if activity == 'Detected' else
-                                'System Off' if dev.id == 1 else 'Read failed')
+                                ('System Off' if activity == 'Not detected' else 'Pending')
+                                if dev.id == 1 else 'Read failed')
                     self.assertEqual(dev.states['status'], expected)
                     self.assertEqual(dev.error, expected)
                     self.assertFalse(dev.states['dataValid'])
@@ -1463,7 +1521,9 @@ class AdapterTests(unittest.TestCase):
     def test_system_status_table_and_verified_error_precedence(self):
         cases = [
             (Result(), 'Comm Fail'),
-            (Result(tcp_available=True), 'System Off'),
+            (Result(tcp_available=True), 'Pending'),
+            (Result(tcp_available=True, optical_checked=True, optical_activity='Not detected'), 'System Off'),
+            (Result(tcp_available=True, optical_activity='Not detected'), 'Pending'),
             (Result(tcp_available=True, optical_activity='Detected'), 'Pending'),
             (Result(values={'outsideTemp': 12}, tcp_available=True), 'Online'),
             (Result(values={'outsideTemp': 12}, tcp_available=True,
@@ -1473,7 +1533,7 @@ class AdapterTests(unittest.TestCase):
             # A fault retained in a disconnected/no-response result cannot
             # establish a current fault; communication evidence takes precedence.
             (Result(verified_active_fault_code='D1'), 'Comm Fail'),
-            (Result(tcp_available=True, verified_active_fault_code='D1'), 'System Off'),
+            (Result(tcp_available=True, verified_active_fault_code='D1'), 'Pending'),
         ]
         for result, expected in cases:
             with self.subTest(expected=expected):
@@ -1492,8 +1552,8 @@ class AdapterTests(unittest.TestCase):
             self.assertEqual(dev.error, 'Comm Fail' if dev.id == 1 else 'Connect failed')
         self.plugin._publish(Result(errors={'boilerTemp': 'Response timeout'}, tcp_available=True))
         for dev in self.devices.values():
-            self.assertEqual(dev.states['status'], 'System Off' if dev.id == 1 else 'Read failed')
-            self.assertEqual(dev.error, 'System Off' if dev.id == 1 else 'Read failed')
+            self.assertEqual(dev.states['status'], 'Pending' if dev.id == 1 else 'Read failed')
+            self.assertEqual(dev.error, 'Pending' if dev.id == 1 else 'Read failed')
 
     def test_live_heater_uses_verified_room_temperature_with_writes_disabled(self):
         self.plugin._publish(Result(values=readings(66, -3, 20, 46), tcp_available=True))
@@ -1539,7 +1599,7 @@ class AdapterTests(unittest.TestCase):
         # Retained measurements must not turn a later total failure into Pending.
         self.plugin._publish(Result(errors={'warmWaterTemp': 'Timeout'}, tcp_available=True))
         for dev in self.devices.values():
-            self.assertEqual(dev.states['status'], 'System Off' if dev.id == 1 else 'Read failed')
+            self.assertEqual(dev.states['status'], 'Pending' if dev.id == 1 else 'Read failed')
             self.assertFalse(dev.states['dataValid'])
         self.assertEqual(dhw.states['warmWaterTemp'], 31.1)
 

@@ -216,8 +216,10 @@ class Client:
             self.sock.sendall((command + '\n').encode('ascii'))
             return self._frame(cancelled)
         except InterruptedError:
+            self.disconnect()
             raise
         except (OSError, ValueError, UnicodeError) as exc:
+            self.disconnect()
             message = 'Communication failure: %s after %.2fs: %s' % (
                 command, time.monotonic() - started, exc)
             error_type = (TimeoutError if isinstance(exc, TimeoutError) else
@@ -251,9 +253,11 @@ class Client:
                 elif response.startswith('ERR') or 'Error executing' in response:
                     source = 'vcontrold-reported error'
                 elif 'UNKNOWN' in response:
-                    source = 'vcontrold returned an unmapped value'
+                    source = 'vcontrold returned UNKNOWN (raw value unavailable)'
+                elif 'synchronization' in str(exc).lower():
+                    source = 'Suspect optical protocol data'
                 else:
-                    source = 'Plugin data-validation error'
+                    source = 'Received-data validation failure'
                 detail = source + ': %s read attempt %d/2 after %.2fs: %s; reply=%r' % (
                     command, attempt, time.monotonic() - started, exc,
                     response[:400] if response is not None else None)
@@ -286,37 +290,49 @@ class Client:
             elif re.fullmatch(r'Result: +[0-9A-Fa-f]{2}', reply):
                 result.optical_activity = 'Unexpected byte'
                 result.optical_error = reply
-            else:
+            elif not reply:
                 result.optical_activity = 'Not detected'
-                result.optical_error = reply[:400] or 'No byte returned by receive-only probe'
+                result.optical_error = 'Completed receive-only probe returned no byte'
+            else:
+                result.optical_activity = 'Unavailable'
+                result.optical_error = reply[:400]
         except (OSError, ValueError, UnicodeError) as exc:
-            # Raw RECV exits the vcontrold child on receive timeout. A missing
-            # Result is not proof of power-off; keep the actual diagnostic.
-            result.optical_activity = 'Not detected'
+            # Disconnect/deadline cannot distinguish a quiet optical port from
+            # failed raw execution. Keep this inconclusive, not System Off.
+            result.optical_activity = 'Unavailable'
             result.optical_error = str(exc)
             self.disconnect()
             if cancelled():
                 raise InterruptedError('Polling cancelled')
 
-    def _connect(self, cancelled):
+    def _connect(self, cancelled, result=None):
         if self.sock is None:
             self.sock = socket.create_connection(
                 (self.settings.host, self.settings.port), min(5, self.settings.timeout))
-            self._frame(cancelled)
+            if result is not None:
+                result.tcp_available = True
+            try:
+                self._frame(cancelled)
+            except (OSError, ValueError, UnicodeError):
+                self.disconnect()
+                raise
 
     def _ensure_health(self, result, cancelled, force=False):
-        self._connect(cancelled)
+        self._connect(cancelled, result)
         result.tcp_available = True
         identity = self._exchange('device', cancelled)
         result.simulator = identity == SIMULATOR_ID
         result.live_identity = identity == LIVE_ID
+        if not re.fullmatch(r'[^\r\n]+ \(ID=[0-9A-Fa-f]{4}\) \(Protocol=[A-Za-z0-9]+\)', identity):
+            self.disconnect()
+            raise ValueError('Invalid vcontrold device identity: ' + identity[:160])
         if (force or self.last_health is None
                 or time.monotonic() - self.last_health >= self.settings.health_interval):
             text = self._exchange('getSystemTime', cancelled)
             if not re.fullmatch(r'20[0-9]{2}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[+-][0-9]{4}', text):
                 source = ('vcontrold-reported error' if text.startswith('ERR') else
-                          'vcontrold returned an unmapped value' if 'UNKNOWN' in text else
-                          'Plugin data-validation error')
+                          'vcontrold returned UNKNOWN (raw value unavailable)' if 'UNKNOWN' in text else
+                          'Received-data validation failure')
                 raise ValueError(source + ': getSystemTime: Invalid controller time: ' + text[:160])
             datetime.strptime(text, '%Y-%m-%dT%H:%M:%S%z')
             self.last_health = time.monotonic()
@@ -421,8 +437,8 @@ class Client:
                 setattr(result, attribute, text)
             except ValueError as exc:
                 source = ('vcontrold-reported error' if text.startswith('ERR') or 'Error executing' in text else
-                          'vcontrold returned an unmapped value' if 'UNKNOWN' in text else
-                          'Plugin data-validation error')
+                          'vcontrold returned UNKNOWN (raw value unavailable)' if 'UNKNOWN' in text else
+                          'Received-data validation failure')
                 exc = ValueError('%s: %s: %s; reply=%r' % (source, command, exc, text[:160]))
                 errors.append(str(exc))
                 if attribute == 'burner_output':
@@ -450,19 +466,13 @@ class Client:
         result.party_attempted = True
         try:
             def party_mode(raw):
-                if raw not in ('0', '1'):
-                    # Separate read, not claimed to be the same sample as UNKNOWN.
-                    try:
-                        diagnostic = self._exchange('getProbePartyModeRaw', cancelled)
-                    except InterruptedError:
-                        raise
-                    except (OSError, ValueError, UnicodeError) as exc:
-                        diagnostic = 'unavailable: ' + str(exc)
-                    raise ValueError('Invalid party mode: %r; subsequent raw byte=%r' %
-                                     (raw[:80], diagnostic[:160]))
+                if raw not in ('00', '01'):
+                    detail = ('Suspect synchronization byte' if raw == '05' else
+                              'Invalid party-mode raw byte')
+                    raise ValueError(detail + ': ' + repr(raw[:80]))
                 return raw
-            raw = self._read_value('getPartyModeA1', party_mode, result, cancelled)
-            result.party_mode = raw == '1'
+            raw = self._read_value('getProbePartyModeRaw', party_mode, result, cancelled)
+            result.party_mode = raw == '01'
             result.party_checked = datetime.now(timezone.utc).isoformat(timespec='seconds')
             result.room_target = 'party' if result.party_mode else self.settings.target
             party = self._read_value('getTempPartyM1', temperature, result, cancelled)
@@ -592,11 +602,11 @@ class Client:
             if self._ensure_health(health, cancelled) != identity:
                 raise PermissionError('Controller identity changed')
             if kind in ('partyMode', 'partyToggle'):
-                current = self._exchange('getPartyModeA1', cancelled)
-                if current not in ('0', '1'):
+                current = self._exchange('getProbePartyModeRaw', cancelled)
+                if current not in ('00', '01'):
                     raise ValueError('Invalid current party mode')
                 if kind == 'partyToggle':
-                    value = current == '0'
+                    value = current == '00'
                 command = 'setPartyModeA1 %d' % value
             else:
                 current = self._exchange('getSystemTime', cancelled)
@@ -613,9 +623,9 @@ class Client:
             self.sock.sendall((command + '\n').encode('ascii'))
             if self._frame(cancelled) != 'OK':
                 raise ValueError('Setter not acknowledged; result uncertain, not retried')
-            actual = self._exchange('getSystemTime' if kind == 'clock' else 'getPartyModeA1', cancelled)
+            actual = self._exchange('getSystemTime' if kind == 'clock' else 'getProbePartyModeRaw', cancelled)
             if kind in ('partyMode', 'partyToggle'):
-                if actual != str(int(value)):
+                if actual != '%02X' % int(value):
                     raise ValueError('Party-mode readback mismatch; not retried')
                 return value
             if not actual.endswith('+0000'):
@@ -649,10 +659,10 @@ class Client:
             if checked_identity != identity:
                 raise PermissionError('Controller identity changed before write')
             if follow_party and identity == LIVE_ID and target != 'dhw':
-                mode = self._exchange('getPartyModeA1', cancelled)
-                if mode not in ('0', '1'):
+                mode = self._exchange('getProbePartyModeRaw', cancelled)
+                if mode not in ('00', '01'):
                     raise ValueError('Current party mode unavailable; room write cancelled')
-                effective = 'party' if mode == '1' else self.settings.target
+                effective = 'party' if mode == '01' else self.settings.target
                 if target != effective:
                     raise ValueError('Party mode changed before room write; refresh and retry explicitly')
             read, setter = TARGETS[target]

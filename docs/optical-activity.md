@@ -67,3 +67,8 @@ System-only labels and precedence are now:
 | TCP established, no usable readings or detected 0x05 | System Off |
 
 System Off is the owner's chosen inferred label, not independently measured power state. A disabled/unsupported/unavailable probe provides no positive optical evidence and can therefore reach that fallback. Error CODE takes precedence over Online/Pending, but only with current response evidence. Result.verified_active_fault_code is reserved for a future verified current-fault producer; no live polling command sets it yet, so Error CODE is implemented/tested but cannot currently be emitted from live fault history. getErrorX/D1 history is never promoted to current fault state. Child status semantics are unchanged. Simulator system status retains an explicit SIMULATOR prefix without hiding Error CODE. dataValid and diagnostics remain separate.
+
+
+## Status evidence refinement — 0.2.36
+
+Supersedes the broad 0.2.10 fallback: System Off now requires optical_checked plus Not detected from a completed empty probe. A failed raw exchange, unsupported/disabled probe, or unexpected response instead leaves the system Pending. TCP connection is recorded before waiting for the daemon greeting, so a greeting timeout does not imply the port was unavailable. Detected activity still uses the existing resync grace; valid data and known faults retain precedence.

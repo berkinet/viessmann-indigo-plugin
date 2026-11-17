@@ -482,7 +482,9 @@ class Plugin(indigo.PluginBase):
             return 'Online' if self.fault_sampled else 'Awaiting fault check'
         if result.optical_activity == 'Detected':
             return 'Resync optical link' if result.health_error else 'Pending'
-        return 'System Off'
+        if result.optical_checked and result.optical_activity == 'Not detected':
+            return 'System Off'
+        return 'Pending'
 
     def _health_updates(self, result):
         updates = [{'key': 'healthValid', 'value': result.health_ok},

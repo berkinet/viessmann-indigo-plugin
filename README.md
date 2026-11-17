@@ -126,3 +126,13 @@ The initial sampling pass checks faults before requesting temperatures, and publ
 ## Version 0.2.35 — current alarm-code priority
 
 During an active production fault, the valid current alarm code displays **Error D1** (or the received code), even after local acknowledgment clears the relay bit. **Production fault** is the fallback when no current code is known. Fault clearance and new episodes do not inherit an old production alarm code.
+
+## Version 0.2.36 — response alignment and status evidence
+
+Failed exchanges now disconnect and discard buffered replies, preventing delayed holiday responses from being mistaken for the next device/clock response. The health handshake validates device identity before requesting the clock. A greeting failure after TCP connection is recorded as a response failure, rather than a failed connection.
+
+System Off requires a completed receive-only probe returning no byte. Inconclusive, failed, disabled or unsupported probes instead leave the system Pending; detected optical activity retains the existing resync grace period. Known fault priority is unchanged.
+
+Party-mode polling, pre-write checks and readback use the verified raw getter (00/01). Unexpected bytes remain invalid and appear in diagnostics. Received-data validation failures no longer imply a proven plugin bug; synchronization-like replies are identified separately. Writes are never automatically retried.
+
+The malformed installed getStorageTemp definition has been disabled with a backup, without substituting an unverified address. See docs/recovery-2026-11-17.md.

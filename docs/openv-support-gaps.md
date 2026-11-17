@@ -75,3 +75,8 @@ Local comparison applied base command fields then 209F-specific overrides, compa
 ## Subsequent authorized configuration change
 
 The owner subsequently authorized additions to the deployed XML. See read-probes.md for the nine isolated experimental reads, verification and backup. Their registration does not change the evidence status above or enable them in the plugin.
+
+
+### 17 November correction
+
+The earlier normalized 0070 description must not be mistaken for the actual wire request. The deployed override contained the one-byte address text 70 and generated malformed KW2 bytes 01 F7 70 01. The installed getStorageTemp declaration is now disabled with a backup; no fallback to 0812 is enabled. Historical counts above describe the earlier catalog, not current supported functions. The 0812 candidate remains unverified.
