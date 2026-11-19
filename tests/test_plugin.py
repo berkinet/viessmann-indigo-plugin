@@ -1310,6 +1310,48 @@ class AdapterTests(unittest.TestCase):
         self.assertFalse(calls)
         self.assertFalse(self.devices[3].pluginProps['SupportsHeatSetpoint'])
 
+    def test_holiday_reminder_confirmation_failure_and_newer_edit(self):
+        stub = sys.modules['indigo']
+        depart = types.SimpleNamespace(id=41, name='vitoHolidayDepartureDraft', value='2090-11-20')
+        returning = types.SimpleNamespace(id=42, name='vitoHolidayReturnDraft', value='2090-12-13')
+        note = types.SimpleNamespace(id=43, value='')
+        stub.variables = {depart.name: depart, returning.name: returning, 'vitoHolidayEditNote': note}
+        by_id = {v.id: v for v in stub.variables.values()}
+        stub.variable = types.SimpleNamespace(updateValue=lambda ident, value: setattr(by_id[ident], 'value', value))
+        dev = self.devices[1]
+        dev.states.update(holidayValid=True, holidayDeparture=depart.value, holidayReturn=returning.value)
+        self.plugin._holiday_page_pair = (depart.value, returning.value)
+        depart.value = '2090-11-21'
+        self.plugin.variableUpdated(types.SimpleNamespace(value='2090-11-20'), depart)
+        self.assertEqual(note.value, 'Press Apply Holiday Dates')
+        def apply():
+            self.plugin.setHoliday(types.SimpleNamespace(props={'departure': depart.value, 'returning': returning.value}), dev)
+        apply(); apply()
+        self.assertEqual(self.plugin.events.qsize(), 1)
+        self.assertEqual(note.value, 'Update pending')
+        self.plugin.manager.write_holiday = lambda *a, **kw: holiday_state('2090-11-21T00:00:00+0000', '2090-12-13T00:00:00+0000', '02')
+        self.plugin._process_events()
+        self.assertEqual(note.value, '')
+        self.assertIsNone(self.plugin.pending_holiday)
+        depart.value = '2090-11-22'
+        def fail(*a, **kw): raise ValueError('uncertain holiday readback')
+        self.plugin.manager.write_holiday = fail
+        apply(); self.plugin._process_events()
+        self.assertEqual(note.value, 'Press Apply Holiday Dates')
+        self.assertIsNone(self.plugin.pending_holiday)
+        self.assertEqual(depart.value, '2090-11-22')
+        def newer(*a, **kw):
+            depart.value = '2090-11-23'
+            return holiday_state('2090-11-22T00:00:00+0000', '2090-12-13T00:00:00+0000', '02')
+        self.plugin.manager.write_holiday = newer
+        apply(); self.plugin._process_events()
+        self.assertEqual(depart.value, '2090-11-23')
+        self.assertEqual(dev.states['holidayDeparture'], '2090-11-22')
+        self.assertEqual(note.value, 'Press Apply Holiday Dates')
+        # Even a changed controller date must not overwrite this unsent edit.
+        self.plugin._sync_holiday_page({'holidayDeparture': '2090-11-24', 'holidayReturn': returning.value})
+        self.assertEqual(depart.value, '2090-11-23')
+
     def test_setpoint_note_and_input_lock_follow_confirmation_and_failure(self):
         stub = sys.modules['indigo']
         draft = types.SimpleNamespace(id=31, name='vitoRoomSetpointDraft', value='20')

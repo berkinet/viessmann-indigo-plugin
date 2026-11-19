@@ -11,3 +11,9 @@ The UI trial is local to the owner's page. It does not add HVAC program controls
 Validation covers confirmation/failure note transitions, suppression of repeated pending inputs, independent room/DHW locks, relative edits based on the last readback, and the existing lifecycle/write safeguards. An obsolete expectation that rapid taps queued two writes was updated to require a fresh input after the first readback, retaining its regression coverage.
 
 Holiday highlighting is a follow-up requested only after this setpoint trial is verified; it is not implemented by this release.
+
+## Holiday extension — 0.2.41
+
+Owner approved the trial, requested removal of the temperature arrows and asked for the same holiday behavior. The page now retains only the editable temperature entries and Set buttons. Both holiday date backgrounds and one reminder are bound to `vitoHolidayEditNote`; the image family includes the yellow exact-value state `Press Apply Holiday Dates`, plus `Update pending` and the white empty state.
+
+Holiday Apply/Clear share one pending-input lock. The reminder clears only on matching valid controller dates. Failed updates retain the draft/reminder; regular polling and external date changes do not overwrite a dirty draft. Edits made while an earlier operation is executing survive its readback. A shared pair highlight intentionally marks both date fields when either is unapplied.

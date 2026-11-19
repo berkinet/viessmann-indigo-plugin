@@ -152,3 +152,7 @@ The thermostat action callback now accepts Indigo's native status, temperature, 
 ## Version 0.2.40 — setpoint draft notes and pending-input lock
 
 Optional control-page draft variables now have matching notes: Press Set to apply while an entered target differs from a confirmed target, Update pending during a write, and blank after matching confirmed readback. Failed or invalid readings do not clear an outstanding draft. Each thermostat accepts only one pending setpoint operation; extra inputs are ignored until it completes or fails. The other device remains independently usable. No uncertain write retries were added.
+
+## Version 0.2.41 — holiday draft highlighting
+
+Holiday draft dates now use the same optional pending-edit reminder as setpoints: Press Apply Holiday Dates, Update pending, then blank after matching valid readback. Apply/Clear submissions are serialized without retrying uncertain writes. Routine polls and external date changes preserve unsent edits, and a newer edit made during a write is retained. The local page removes the temperature arrows and retains the popup entry and Set buttons.

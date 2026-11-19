@@ -16,6 +16,7 @@ class Plugin(indigo.PluginBase):
         self.system_id = None
         self.unavailable = {}
         self.pending_sets = {}
+        self.pending_holiday = None
         self.pending_lock = threading.RLock()
         self.established_fault = ''
         self.state_images = {}
@@ -33,6 +34,8 @@ class Plugin(indigo.PluginBase):
     def variableUpdated(self, oldVar, newVar):
         if newVar.name == 'vitoPartyTemperatureDraft' and oldVar.value != newVar.value:
             self._set_party_note('Unset')
+        if newVar.name in ('vitoHolidayDepartureDraft', 'vitoHolidayReturnDraft') and oldVar.value != newVar.value:
+            self._sync_holiday_note()
         if newVar.name in ('vitoRoomSetpointDraft', 'vitoDhwSetpointDraft') and oldVar.value != newVar.value:
             for ident in list(self.active):
                 dev = self._device(ident)
@@ -63,6 +66,47 @@ class Plugin(indigo.PluginBase):
                     indigo.variable.updateValue(note.id, value=text)
         except (KeyError, AttributeError):
             pass  # These optional dashboard variables are not required by the plugin.
+
+    def _holiday_draft_pair(self):
+        try:
+            return tuple(indigo.variables[name].value.strip() for name in
+                         ('vitoHolidayDepartureDraft', 'vitoHolidayReturnDraft'))
+        except (KeyError, AttributeError):
+            return None
+
+    def _sync_holiday_note(self):
+        dev = self._device(self.system_id)
+        if dev is None:
+            return
+        try:
+            note = indigo.variables['vitoHolidayEditNote']
+            draft = self._holiday_draft_pair()
+            if draft is None:
+                return
+            with self.pending_lock:
+                if self.pending_holiday is not None:
+                    text = 'Update pending'
+                else:
+                    actual = (dev.states.get('holidayDeparture', ''), dev.states.get('holidayReturn', ''))
+                    if draft == actual:
+                        if not dev.states.get('holidayValid', False):
+                            return  # A failed sample cannot confirm or invalidate a draft.
+                        text = ''
+                    else:
+                        text = 'Press Apply Holiday Dates'
+                if note.value != text:
+                    indigo.variable.updateValue(note.id, value=text)
+        except (KeyError, AttributeError):
+            pass
+
+    def _begin_holiday(self):
+        with self.pending_lock:
+            if self.pending_holiday is not None:
+                self.logger.debug('Ignoring holiday input while update is pending')
+                return False
+            self.pending_holiday = {'draft': self._holiday_draft_pair()}
+            self._sync_holiday_note()
+            return True
 
     @staticmethod
     def _set_party_note(value):
@@ -212,6 +256,8 @@ class Plugin(indigo.PluginBase):
                 raise ValueError('Select the active Viessmann system')
             departure = date.fromisoformat(str(action.props.get('departure', '')).strip()).isoformat()
             returning = date.fromisoformat(str(action.props.get('returning', '')).strip()).isoformat()
+            if not self._begin_holiday():
+                return
             dev.updateStatesOnServer([{'key': 'holidayActionStatus', 'value': 'Pending holiday confirmation'}])
             self.events.put(('holiday', (dev.id, departure, returning, self.manager.settings)))
         except (ValueError, TypeError) as exc:
@@ -261,21 +307,25 @@ class Plugin(indigo.PluginBase):
         if dev.deviceTypeId != 'viessmannSystem' or dev.id != self.system_id:
             self.logger.error('Select the active Viessmann system')
             return
+        if not self._begin_holiday():
+            return
         dev.updateStatesOnServer([{'key': 'holidayActionStatus', 'value': 'Pending holiday clear confirmation'}])
         self.events.put(('clearHoliday', (dev.id, '1970-01-01', '1970-01-01', self.manager.settings)))
 
-    def _sync_holiday_page(self, holiday, force=False):
-        # Optional control-page input variables. Refresh on actual changes only,
-        # so routine polling cannot erase dates the owner is currently editing.
+    def _sync_holiday_page(self, holiday, force=False, preserve_draft=False):
         pair = (holiday['holidayDeparture'], holiday['holidayReturn'])
-        if not force and getattr(self, '_holiday_page_pair', None) == pair:
-            return
+        previous = getattr(self, '_holiday_page_pair', None)
+        draft = self._holiday_draft_pair()
+        dirty = previous is not None and draft is not None and draft != previous
         variables = getattr(indigo, 'variables', None)
         if variables is None:
             return
-        for name, value in zip(('vitoHolidayDepartureDraft', 'vitoHolidayReturnDraft'), pair):
-            if name in variables:
-                indigo.variable.updateValue(variables[name].id, value=value)
+        # External changes and polling must not erase unsent edits. A confirmed
+        # Apply/Clear can replace the submitted draft, but not a newer edit.
+        if not preserve_draft and not (dirty and not force) and (force or pair != previous):
+            for name, value in zip(('vitoHolidayDepartureDraft', 'vitoHolidayReturnDraft'), pair):
+                if name in variables:
+                    indigo.variable.updateValue(variables[name].id, value=value)
         self._holiday_page_pair = pair
 
     def _holiday_updates(self, result):
@@ -379,6 +429,8 @@ class Plugin(indigo.PluginBase):
             dev.setErrorStateOnServer(display_error)
             self._update_state_icon(dev, updates)
             self._sync_setpoint_note(dev)
+            if dev.deviceTypeId == 'viessmannSystem':
+                self._sync_holiday_note()
 
     def actionControlThermostat(self, action, dev):
         # Native popups/bridges can request thermostat reads through this
@@ -883,12 +935,16 @@ class Plugin(indigo.PluginBase):
                 self._configure()
                 dev = self._device(ident)
                 if dev is None:
+                    with self.pending_lock:
+                        self.pending_holiday = None
                     continue
                 try:
                     if ident != self.system_id or expected is None or self.manager.settings != expected:
                         raise ValueError('Configuration changed before holiday action; retry explicitly')
                     actual = self.manager.write_holiday(departure, returning, self.closing.is_set, clear=action == 'clearHoliday')
-                    self._sync_holiday_page(actual, force=True)
+                    newer_edit = (self.pending_holiday is not None and
+                                  self._holiday_draft_pair() != self.pending_holiday['draft'])
+                    self._sync_holiday_page(actual, force=True, preserve_draft=newer_edit)
                     dev.updateStatesOnServer([{'key': k, 'value': v} for k, v in actual.items()] + [
                         {'key': 'holidayValid', 'value': True}, {'key': 'holidayError', 'value': ''},
                         {'key': 'holidayUpdated', 'value': datetime.now(timezone.utc).isoformat(timespec='seconds')},
@@ -899,6 +955,9 @@ class Plugin(indigo.PluginBase):
                         {'key': 'holidayActionStatus', 'value': str(exc)}])
                     self.logger.error('Holiday action rejected/failed: %s', exc)
                 finally:
+                    with self.pending_lock:
+                        self.pending_holiday = None
+                        self._sync_holiday_note()
                     self.manager.request_poll()
                 continue
             if action == 'write':
@@ -999,6 +1058,7 @@ class Plugin(indigo.PluginBase):
             self.manager.close()
             with self.pending_lock:
                 self.pending_sets.clear()
+                self.pending_holiday = None
             for device_id in list(self.active):
                 dev = self._device(device_id)
                 if dev is not None:
