@@ -143,6 +143,7 @@ class Result:
     party_setpoint: float | None = None
     party_temperature: float | None = None
     diagnostics: list = field(default_factory=list)
+    failed_read_diagnostics: list = field(default_factory=list)
 
 
 def alarm_block(text):
@@ -265,6 +266,7 @@ class Client:
                 # Discard any partial frame before retrying on a fresh session.
                 self.disconnect()
                 if attempt == 2:
+                    result.failed_read_diagnostics.append(detail)
                     if isinstance(exc, OSError):
                         raise OSError(detail) from exc
                     raise ValueError(detail) from exc

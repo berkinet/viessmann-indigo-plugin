@@ -653,7 +653,9 @@ class Plugin(indigo.PluginBase):
             if self.production_fault and result.alarm_code is not None:
                 self.production_alarm_code = '' if result.alarm_code == '00' else result.alarm_code
             for diagnostic in result.diagnostics:
-                self.logger.warning('Read diagnostic: %s', diagnostic)
+                log = (self.logger.error if diagnostic in result.failed_read_diagnostics
+                       else self.logger.debug)
+                log('Read diagnostic: %s', diagnostic)
             self._publish_party(result)
         if result.health_only:
             self._publish_health(result)

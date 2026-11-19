@@ -136,3 +136,7 @@ System Off requires a completed receive-only probe returning no byte. Inconclusi
 Party-mode polling, pre-write checks and readback use the verified raw getter (00/01). Unexpected bytes remain invalid and appear in diagnostics. Received-data validation failures no longer imply a proven plugin bug; synchronization-like replies are identified separately. Writes are never automatically retried.
 
 The malformed installed getStorageTemp definition has been disabled with a backup, without substituting an unverified address. See docs/recovery-2026-11-17.md.
+
+## Version 0.2.37 — quiet successful read retries
+
+First read failures and successful retry notices now log at debug level. If both read attempts fail, the final diagnostic logs once at error level. Read validation, reconnects, retry limits, write safeguards and device-status handling are unchanged.

@@ -164,6 +164,7 @@ class ReadRecoveryTests(unittest.TestCase):
         self.assertIn("reply='ERR: Wrong result, terminating'", result.diagnostics[0])
         self.assertIn('vcontrold-reported error:', result.diagnostics[0])
         self.assertIn('recovered', result.diagnostics[1])
+        self.assertEqual(result.failed_read_diagnostics, [])
 
     def test_processing_errors_are_distinguished_from_daemon_errors(self):
         from unittest.mock import Mock
@@ -185,6 +186,7 @@ class ReadRecoveryTests(unittest.TestCase):
         self.assertEqual(client._exchange.call_count, 2)
         self.assertIsNone(client.sock)
         self.assertEqual(result.values, {})
+        self.assertEqual(result.failed_read_diagnostics, [result.diagnostics[-1]])
 
     def test_timeout_reconnects_and_cancellation_does_not_retry(self):
         from unittest.mock import Mock
@@ -747,6 +749,24 @@ class AdapterTests(unittest.TestCase):
             self.devices[d.id] = d; self.plugin.deviceStartComm(d)
         self.plugin._process_events(); self.plugin._configure()
         self.plugin.fault_sampled = True  # Existing tests start after initial fault assessment.
+
+    def test_recovered_read_is_debug_only_and_exhausted_retry_logs_one_error(self):
+        from unittest.mock import Mock
+        self.plugin.logger = Mock()
+        first = 'getProbePartyModeRaw read attempt 1/2: suspect 05'
+        recovered = 'getProbePartyModeRaw recovered on read retry'
+        self.plugin._publish(Result(health_only=True, tcp_available=True, health_ok=True,
+                                    diagnostics=[first, recovered]))
+        self.assertEqual(self.plugin.logger.debug.call_count, 2)
+        self.plugin.logger.warning.assert_not_called()
+        self.plugin.logger.error.assert_not_called()
+        final = 'getProbePartyModeRaw read attempt 2/2: suspect 05'
+        self.plugin.logger.reset_mock()
+        self.plugin._publish(Result(health_only=True, tcp_available=True, health_ok=True,
+                                    diagnostics=[first, final], failed_read_diagnostics=[final]))
+        self.plugin.logger.debug.assert_called_once_with('Read diagnostic: %s', first)
+        self.plugin.logger.error.assert_called_once_with('Read diagnostic: %s', final)
+        self.plugin.logger.warning.assert_not_called()
 
     def tearDown(self):
         self.plugin.stopConcurrentThread()
