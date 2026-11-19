@@ -144,3 +144,7 @@ First read failures and successful retry notices now log at debug level. If both
 ## Version 0.2.38 — consistent startup status
 
 The system and both thermostat children consistently display Awaiting polling while waiting for their initial readings. Previously, a child that started before the system could retain Plugin restarted, while a child starting afterward displayed Awaiting polling. Startup-order regression coverage checks all six device-order permutations. Polling and fault handling are unchanged.
+
+## Version 0.2.39 — native thermostat read requests
+
+The thermostat action callback now accepts Indigo's native status, temperature, setpoint, mode, equipment, humidity and deadband read requests by scheduling a shared refresh. Previously it accepted only heat-setpoint writes, incorrectly logging every native read request as unsupported. Refreshing does not fabricate unsupported mode/fan/humidity/deadband values or enable new controls. Truly unsupported actions now identify the device, action, requested mode and value in the error. Heat-setpoint and write safeguards are unchanged.

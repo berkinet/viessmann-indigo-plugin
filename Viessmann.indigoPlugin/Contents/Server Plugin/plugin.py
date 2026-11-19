@@ -348,12 +348,24 @@ class Plugin(indigo.PluginBase):
             self._update_state_icon(dev, updates)
 
     def actionControlThermostat(self, action, dev):
+        # Native popups/bridges can request thermostat reads through this
+        # callback, independently of the universal RequestStatus callback.
+        requests = ('RequestStatusAll', 'RequestMode', 'RequestEquipmentState',
+                    'RequestTemperatures', 'RequestHumidities', 'RequestDeadbands',
+                    'RequestSetpoints')
+        if any(action.thermostatAction == getattr(indigo.kThermostatAction, name)
+               for name in requests if hasattr(indigo.kThermostatAction, name)):
+            self.requestStatus(action, dev)
+            return
         kinds = {indigo.kThermostatAction.SetHeatSetpoint: 'set',
                  indigo.kThermostatAction.IncreaseHeatSetpoint: 'increase',
                  indigo.kThermostatAction.DecreaseHeatSetpoint: 'decrease'}
         kind = kinds.get(action.thermostatAction)
         if kind is None:
-            self.logger.error('Unsupported thermostat action')
+            self.logger.error('Unsupported thermostat action for %s (id=%s): action=%s, mode=%s, value=%s',
+                              dev.name, dev.id, action.thermostatAction,
+                              getattr(action, 'actionMode', None),
+                              getattr(action, 'actionValue', None))
             return
         target = self._room_target(dev) if dev.deviceTypeId == 'viessmannHeater' else 'dhw'
         self._begin_set(dev)

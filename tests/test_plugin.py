@@ -735,6 +735,10 @@ class AdapterTests(unittest.TestCase):
         stub.PluginBase = Base; stub.Dict = dict; stub.devices = Devices()
         stub.kUniversalAction = types.SimpleNamespace(RequestStatus=1)
         stub.kThermostatAction = types.SimpleNamespace(SetHeatSetpoint=1, IncreaseHeatSetpoint=2, DecreaseHeatSetpoint=3)
+        for value, name in enumerate(('RequestStatusAll', 'RequestMode', 'RequestEquipmentState',
+                                      'RequestTemperatures', 'RequestHumidities', 'RequestDeadbands',
+                                      'RequestSetpoints', 'SetHvacMode'), 4):
+            setattr(stub.kThermostatAction, name, value)
         self.previous = sys.modules.get('indigo'); sys.modules['indigo'] = stub
         spec = importlib.util.spec_from_file_location('plugin_under_test',
             ROOT / 'Viessmann.indigoPlugin/Contents/Server Plugin/plugin.py')
@@ -749,6 +753,34 @@ class AdapterTests(unittest.TestCase):
             self.devices[d.id] = d; self.plugin.deviceStartComm(d)
         self.plugin._process_events(); self.plugin._configure()
         self.plugin.fault_sampled = True  # Existing tests start after initial fault assessment.
+
+    def test_native_thermostat_read_requests_refresh_both_children_without_writing(self):
+        from unittest.mock import Mock
+        self.plugin.logger = Mock()
+        for dev in (self.devices[2], self.devices[3]):
+            for name in ('RequestStatusAll', 'RequestMode', 'RequestEquipmentState',
+                         'RequestTemperatures', 'RequestHumidities', 'RequestDeadbands',
+                         'RequestSetpoints'):
+                with self.subTest(device=dev.id, request=name):
+                    action = types.SimpleNamespace(thermostatAction=getattr(sys.modules['indigo'].kThermostatAction, name))
+                    self.plugin.actionControlThermostat(action, dev)
+                    self.assertEqual(self.plugin.events.get_nowait(), ('refresh', dev.id))
+                    self.assertTrue(self.plugin.events.empty())
+                    self.assertNotIn(dev.id, self.plugin.pending_sets)
+        self.plugin.logger.error.assert_not_called()
+
+    def test_unsupported_mode_action_identifies_device_and_request_without_writing(self):
+        from unittest.mock import Mock
+        self.plugin.logger = Mock()
+        dev = self.devices[3]
+        action = types.SimpleNamespace(thermostatAction=sys.modules['indigo'].kThermostatAction.SetHvacMode,
+                                       actionMode='Heat', actionValue=0)
+        self.plugin.actionControlThermostat(action, dev)
+        self.assertTrue(self.plugin.events.empty())
+        self.assertNotIn(dev.id, self.plugin.pending_sets)
+        self.plugin.logger.error.assert_called_once_with(
+            'Unsupported thermostat action for %s (id=%s): action=%s, mode=%s, value=%s',
+            dev.name, dev.id, action.thermostatAction, 'Heat', 0)
 
     def test_startup_status_is_consistent_for_every_device_start_order(self):
         from itertools import permutations
