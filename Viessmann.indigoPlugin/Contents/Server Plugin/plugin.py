@@ -33,6 +33,36 @@ class Plugin(indigo.PluginBase):
     def variableUpdated(self, oldVar, newVar):
         if newVar.name == 'vitoPartyTemperatureDraft' and oldVar.value != newVar.value:
             self._set_party_note('Unset')
+        if newVar.name in ('vitoRoomSetpointDraft', 'vitoDhwSetpointDraft') and oldVar.value != newVar.value:
+            for ident in list(self.active):
+                dev = self._device(ident)
+                if dev is not None:
+                    self._sync_setpoint_note(dev)
+
+    def _sync_setpoint_note(self, dev):
+        names = {'viessmannHeater': ('vitoRoomSetpointDraft', 'vitoRoomSetpointNote', 'roomSetpoint'),
+                 'viessmannWaterHeater': ('vitoDhwSetpointDraft', 'vitoDhwSetpointNote', 'dhwSetpoint')}
+        if (dev.deviceTypeId not in names or
+                str(dev.pluginProps.get('systemId', '')) != str(self.system_id)):
+            return
+        draft_name, note_name, key = names[dev.deviceTypeId]
+        try:
+            draft = indigo.variables[draft_name]
+            note = indigo.variables[note_name]
+            with self.pending_lock:
+                if dev.id in self.pending_sets:
+                    text = 'Update pending'
+                else:
+                    try:
+                        confirmed = (dev.states.get('dataValid', False) and
+                                     float(draft.value) == float(dev.states[key]))
+                    except (KeyError, ValueError, TypeError):
+                        confirmed = False
+                    text = '' if confirmed else 'Press Set to apply'
+                if note.value != text:
+                    indigo.variable.updateValue(note.id, value=text)
+        except (KeyError, AttributeError):
+            pass  # These optional dashboard variables are not required by the plugin.
 
     @staticmethod
     def _set_party_note(value):
@@ -278,26 +308,28 @@ class Plugin(indigo.PluginBase):
 
     def _begin_set(self, dev):
         with self.pending_lock:
-            pending = self.pending_sets.setdefault(dev.id, {
-                'count': 0, 'status': dev.states.get('status', 'Awaiting polling'),
-                'error': None if dev.states.get('dataValid', False) else dev.states.get('status')})
-            pending['count'] += 1
+            if dev.id in self.pending_sets:
+                self.logger.debug('Ignoring setpoint input for %s while update is pending', dev.name)
+                return False
+            self.pending_sets[dev.id] = {
+                'status': dev.states.get('status', 'Awaiting polling'),
+                'error': None if dev.states.get('dataValid', False) else dev.states.get('status')}
             dev.updateStatesOnServer([{'key': 'status', 'value': 'Pending set confirmation'},
                                       {'key': 'actionStatus', 'value': 'Pending set confirmation'}])
             # Native thermostat list displays honor the device message override.
             dev.setErrorStateOnServer('Pending set confirmation')
+            self._sync_setpoint_note(dev)
+            return True
 
     def _finish_set(self, dev):
         with self.pending_lock:
             pending = self.pending_sets.get(dev.id)
             if not pending:
                 return
-            pending['count'] -= 1
-            if pending['count']:
-                return
             del self.pending_sets[dev.id]
             dev.updateStatesOnServer([{'key': 'status', 'value': pending['status']}])
             dev.setErrorStateOnServer(pending['error'])
+            self._sync_setpoint_note(dev)
 
     def _expire_resync(self, device_id, entry):
         # Separate timer: a slow optical read must not extend the grace period.
@@ -346,6 +378,7 @@ class Plugin(indigo.PluginBase):
             dev.updateStatesOnServer(updates)
             dev.setErrorStateOnServer(display_error)
             self._update_state_icon(dev, updates)
+            self._sync_setpoint_note(dev)
 
     def actionControlThermostat(self, action, dev):
         # Native popups/bridges can request thermostat reads through this
@@ -368,7 +401,8 @@ class Plugin(indigo.PluginBase):
                               getattr(action, 'actionValue', None))
             return
         target = self._room_target(dev) if dev.deviceTypeId == 'viessmannHeater' else 'dhw'
-        self._begin_set(dev)
+        if not self._begin_set(dev):
+            return
         self.events.put(('write', (dev.id, target, kind, action.actionValue, self.manager.settings)))
 
     def _write(self, request):

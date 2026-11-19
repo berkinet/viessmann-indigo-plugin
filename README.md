@@ -148,3 +148,7 @@ The system and both thermostat children consistently display Awaiting polling wh
 ## Version 0.2.39 — native thermostat read requests
 
 The thermostat action callback now accepts Indigo's native status, temperature, setpoint, mode, equipment, humidity and deadband read requests by scheduling a shared refresh. Previously it accepted only heat-setpoint writes, incorrectly logging every native read request as unsupported. Refreshing does not fabricate unsupported mode/fan/humidity/deadband values or enable new controls. Truly unsupported actions now identify the device, action, requested mode and value in the error. Heat-setpoint and write safeguards are unchanged.
+
+## Version 0.2.40 — setpoint draft notes and pending-input lock
+
+Optional control-page draft variables now have matching notes: Press Set to apply while an entered target differs from a confirmed target, Update pending during a write, and blank after matching confirmed readback. Failed or invalid readings do not clear an outstanding draft. Each thermostat accepts only one pending setpoint operation; extra inputs are ignored until it completes or fails. The other device remains independently usable. No uncertain write retries were added.

@@ -1310,6 +1310,48 @@ class AdapterTests(unittest.TestCase):
         self.assertFalse(calls)
         self.assertFalse(self.devices[3].pluginProps['SupportsHeatSetpoint'])
 
+    def test_setpoint_note_and_input_lock_follow_confirmation_and_failure(self):
+        stub = sys.modules['indigo']
+        draft = types.SimpleNamespace(id=31, name='vitoRoomSetpointDraft', value='20')
+        note = types.SimpleNamespace(id=32, value='')
+        stub.variables = {draft.name: draft, 'vitoRoomSetpointNote': note}
+        stub.variable = types.SimpleNamespace(updateValue=lambda ident, value: setattr(note, 'value', value))
+        self.devices[1].pluginProps['pollingEnabled'] = True
+        self.plugin._configure()
+        self.plugin._publish(Result(values=readings(66, -3, 20, 46), tcp_available=True, simulator=True))
+        dev = self.devices[2]
+        draft.value = '23'
+        self.plugin.variableUpdated(types.SimpleNamespace(value='20'), draft)
+        self.assertEqual(note.value, 'Press Set to apply')
+        request = types.SimpleNamespace(thermostatAction=1, actionValue=23)
+        self.plugin.actionControlThermostat(request, dev)
+        self.plugin.actionControlThermostat(request, dev)
+        self.assertEqual(self.plugin.events.qsize(), 1)
+        self.assertEqual(note.value, 'Update pending')
+        def fail(*args): raise OSError('uncertain readback')
+        self.plugin.manager.write_setpoint = fail
+        self.plugin._process_events()
+        self.assertEqual(note.value, 'Press Set to apply')
+        self.assertNotIn(dev.id, self.plugin.pending_sets)
+        self.assertEqual(dev.states['roomSetpoint'], 20)
+        self.plugin.actionControlThermostat(request, dev)
+        self.plugin.manager.write_setpoint = lambda *args: 23
+        self.plugin._process_events()
+        self.assertEqual(note.value, '')
+        self.assertEqual(dev.states['roomSetpoint'], 23)
+        # A later edit or failed sample cannot be cleared by stale confirmation.
+        draft.value = '24'
+        self.plugin.variableUpdated(types.SimpleNamespace(value='23'), draft)
+        self.plugin._publish(Result(tcp_available=True, errors={'roomSetpoint': 'timeout'}))
+        self.assertEqual(note.value, 'Press Set to apply')
+
+    def test_pending_setpoint_locks_are_independent_for_room_and_dhw(self):
+        self.plugin.actionControlThermostat(types.SimpleNamespace(thermostatAction=1, actionValue=22), self.devices[2])
+        self.plugin.actionControlThermostat(types.SimpleNamespace(thermostatAction=1, actionValue=50), self.devices[3])
+        self.plugin.actionControlThermostat(types.SimpleNamespace(thermostatAction=1, actionValue=51), self.devices[3])
+        self.assertEqual(self.plugin.events.qsize(), 2)
+        self.assertEqual(set(self.plugin.pending_sets), {2, 3})
+
     def test_pending_set_display_is_immediate_survives_poll_and_clears_after_readback(self):
         self.devices[1].pluginProps['pollingEnabled'] = True
         self.plugin._configure()
@@ -1355,6 +1397,9 @@ class AdapterTests(unittest.TestCase):
         self.plugin.manager.write_setpoint = write
         dev = self.devices[2]
         self.plugin.actionControlThermostat(types.SimpleNamespace(thermostatAction=2, actionValue=1), dev)
+        self.plugin.actionControlThermostat(types.SimpleNamespace(thermostatAction=2, actionValue=1), dev)
+        self.plugin._process_events()
+        self.assertEqual(calls, [('standard', 21)])  # Second tap while pending is ignored.
         self.plugin.actionControlThermostat(types.SimpleNamespace(thermostatAction=2, actionValue=1), dev)
         self.plugin._process_events()
         self.assertEqual(calls, [('standard', 21), ('standard', 22)])
