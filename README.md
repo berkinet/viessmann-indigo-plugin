@@ -140,3 +140,7 @@ The malformed installed getStorageTemp definition has been disabled with a backu
 ## Version 0.2.37 — quiet successful read retries
 
 First read failures and successful retry notices now log at debug level. If both read attempts fail, the final diagnostic logs once at error level. Read validation, reconnects, retry limits, write safeguards and device-status handling are unchanged.
+
+## Version 0.2.38 — consistent startup status
+
+The system and both thermostat children consistently display Awaiting polling while waiting for their initial readings. Previously, a child that started before the system could retain Plugin restarted, while a child starting afterward displayed Awaiting polling. Startup-order regression coverage checks all six device-order permutations. Polling and fault handling are unchanged.

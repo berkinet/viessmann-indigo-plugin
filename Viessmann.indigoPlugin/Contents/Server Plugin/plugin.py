@@ -870,7 +870,7 @@ class Plugin(indigo.PluginBase):
                     for child_id in self.active:
                         child = self._device(child_id)
                         if child is not None and str(child.pluginProps.get('systemId', '')) == str(device_id):
-                            self._unavailable(child, 'Plugin restarted')
+                            self._unavailable(child, 'Awaiting polling')
             else:
                 self.active.discard(device_id)
                 if dev is not None:

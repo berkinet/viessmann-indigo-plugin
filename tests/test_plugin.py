@@ -750,6 +750,20 @@ class AdapterTests(unittest.TestCase):
         self.plugin._process_events(); self.plugin._configure()
         self.plugin.fault_sampled = True  # Existing tests start after initial fault assessment.
 
+    def test_startup_status_is_consistent_for_every_device_start_order(self):
+        from itertools import permutations
+        for order in permutations((1, 2, 3)):
+            with self.subTest(order=order):
+                self.plugin.active.clear()
+                self.plugin.unavailable.clear()
+                for ident in order:
+                    self.plugin.deviceStartComm(self.devices[ident])
+                    self.plugin._process_events()
+                for dev in self.devices.values():
+                    self.assertEqual(dev.states['status'], 'Awaiting polling')
+                    self.assertEqual(dev.error, 'Awaiting polling')
+                    self.assertFalse(dev.states['dataValid'])
+
     def test_recovered_read_is_debug_only_and_exhausted_retry_logs_one_error(self):
         from unittest.mock import Mock
         self.plugin.logger = Mock()
