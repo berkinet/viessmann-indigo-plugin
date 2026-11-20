@@ -1352,6 +1352,46 @@ class AdapterTests(unittest.TestCase):
         self.plugin._sync_holiday_page({'holidayDeparture': '2090-11-24', 'holidayReturn': returning.value})
         self.assertEqual(depart.value, '2090-11-23')
 
+    def test_explicit_holiday_refresh_replaces_draft_but_preserves_newer_edits(self):
+        stub = sys.modules['indigo']
+        depart = types.SimpleNamespace(id=41, value='2090-11-22')
+        returning = types.SimpleNamespace(id=42, value='2090-12-13')
+        note = types.SimpleNamespace(id=43, value='Press Apply Holiday Dates')
+        stub.variables = {'vitoHolidayDepartureDraft': depart, 'vitoHolidayReturnDraft': returning,
+                          'vitoHolidayEditNote': note}
+        by_id = {v.id: v for v in stub.variables.values()}
+        stub.variable = types.SimpleNamespace(updateValue=lambda ident, value: setattr(by_id[ident], 'value', value))
+        actual = holiday_state('2090-11-25T00:00:00+0000', '2090-12-14T00:00:00+0000', '02')
+        dev = self.devices[1]
+        def refresh(): self.plugin.refreshHoliday(None, dev)
+        calls = []
+        def read(*a):
+            calls.append(True)
+            return actual
+        self.plugin.manager.read_holiday = read
+        refresh(); refresh()
+        self.assertEqual(self.plugin.events.qsize(), 1)
+        self.plugin._process_events()
+        self.assertEqual(len(calls), 1)
+        self.assertEqual((depart.value, returning.value), ('2090-11-25', '2090-12-14'))
+        self.assertEqual(note.value, '')
+        self.assertTrue(dev.states['holidayValid'])
+        def fail(*a): raise ValueError('bad holiday read')
+        self.plugin.manager.read_holiday = fail
+        refresh(); self.plugin._process_events()
+        self.assertEqual(depart.value, '2090-11-25')
+        self.assertEqual(dev.states['holidayDeparture'], '2090-11-25')
+        self.assertFalse(dev.states['holidayValid'])
+        self.assertIn('failed', dev.states['holidayActionStatus'])
+        self.assertEqual(note.value, 'Refresh failed')
+        def newer(*a):
+            depart.value = '2090-11-26'
+            return actual
+        self.plugin.manager.read_holiday = newer
+        refresh(); self.plugin._process_events()
+        self.assertEqual(depart.value, '2090-11-26')
+        self.assertEqual(note.value, 'Press Apply Holiday Dates')
+
     def test_setpoint_note_and_input_lock_follow_confirmation_and_failure(self):
         stub = sys.modules['indigo']
         draft = types.SimpleNamespace(id=31, name='vitoRoomSetpointDraft', value='20')
@@ -1793,6 +1833,26 @@ class HolidayTests(unittest.TestCase):
         for args in [(start, empty, '02'), (empty, empty, '03'), (start, end, '05'),
                      (end, start, '02'), ('ERR', end, '02')]:
             with self.assertRaises(ValueError): holiday_state(*args)
+
+    def test_explicit_refresh_reads_only_and_requires_enabled_manager(self):
+        server = FixtureServer()
+        manager = Manager()
+        try:
+            with self.assertRaises(PermissionError): manager.read_holiday()
+            manager.configure(server.settings())
+            self.assertEqual(manager.read_holiday()['holidayStatus'], 'Unset')
+            self.assertEqual(server.commands, ['device', 'getSystemTime', 'getHolidayStart',
+                                               'getHolidayEnd', 'getProbeHolidayActiveRaw'])
+            server.holidays.update(getHolidayStart='2090-11-20T00:00:00+0000',
+                                   getHolidayEnd='2090-12-13T00:00:00+0000')
+            self.assertEqual(manager.read_holiday()['holidayDeparture'], '2090-11-20')
+            self.assertFalse(any(c.startswith('set') for c in server.commands))
+            server.holiday_raw = 'ERR'
+            with self.assertRaises(ValueError): manager.read_holiday()
+            self.assertIsNone(manager.client.sock)
+        finally:
+            manager.close()
+            server.stop()
 
     def test_external_changes_are_read_on_next_poll(self):
         server = FixtureServer()

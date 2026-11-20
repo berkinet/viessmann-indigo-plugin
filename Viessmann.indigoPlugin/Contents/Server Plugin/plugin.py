@@ -250,6 +250,15 @@ class Plugin(indigo.PluginBase):
                 errors[key] = 'Enter a date as YYYY-MM-DD'
         return (False, valuesDict, errors) if errors else (True, valuesDict)
 
+    def refreshHoliday(self, action, dev):
+        if dev.deviceTypeId != 'viessmannSystem' or dev.id != self.system_id:
+            self.logger.error('Holiday refresh requires the active Viessmann system')
+            return
+        if not self._begin_holiday():
+            return
+        dev.updateStatesOnServer([{'key': 'holidayActionStatus', 'value': 'Reading holiday dates from heater'}])
+        self.events.put(('refreshHoliday', (dev.id, self.manager.settings)))
+
     def setHoliday(self, action, dev):
         try:
             if dev.deviceTypeId != 'viessmannSystem' or dev.id != self.system_id:
@@ -929,6 +938,39 @@ class Plugin(indigo.PluginBase):
                     with self.pending_lock:
                         self.pending_party_toggles.discard(ident)
                     self.manager.request_poll()
+                continue
+            if action == 'refreshHoliday':
+                ident, expected = device_id
+                self._configure()
+                dev = self._device(ident)
+                try:
+                    if dev is None or ident != self.system_id or expected is None or self.manager.settings != expected:
+                        raise ValueError('Configuration changed before holiday refresh; retry explicitly')
+                    actual = self.manager.read_holiday(self.closing.is_set)
+                    newer_edit = (self.pending_holiday is not None and
+                                  self._holiday_draft_pair() != self.pending_holiday['draft'])
+                    self._sync_holiday_page(actual, force=True, preserve_draft=newer_edit)
+                    dev.updateStatesOnServer([{'key': k, 'value': v} for k, v in actual.items()] + [
+                        {'key': 'holidayValid', 'value': True}, {'key': 'holidayError', 'value': ''},
+                        {'key': 'holidayUpdated', 'value': datetime.now(timezone.utc).isoformat(timespec='seconds')},
+                        {'key': 'holidayActionStatus', 'value': 'Holiday dates updated from heater'}])
+                except (OSError, ValueError, KeyError, TypeError) as exc:
+                    if dev is not None:
+                        dev.updateStatesOnServer([{'key': 'holidayValid', 'value': False},
+                            {'key': 'holidayError', 'value': str(exc)},
+                            {'key': 'holidayActionStatus', 'value': 'Holiday refresh failed: ' + str(exc)}])
+                    # A failed clean refresh must not leave the pending reminder
+                    # latched after the operation's lock has been released.
+                    try:
+                        note = indigo.variables['vitoHolidayEditNote']
+                        indigo.variable.updateValue(note.id, value='Refresh failed')
+                    except (KeyError, AttributeError):
+                        pass
+                    self.logger.error('Holiday refresh failed: %s', exc)
+                finally:
+                    with self.pending_lock:
+                        self.pending_holiday = None
+                        self._sync_holiday_note()
                 continue
             if action in ('holiday', 'clearHoliday'):
                 ident, departure, returning, expected = device_id

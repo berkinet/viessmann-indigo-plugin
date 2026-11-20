@@ -768,6 +768,21 @@ class Manager:
         actual = self.client.write_setpoint(target, value, cancelled, follow_party=True)
         return actual
 
+    def read_holiday(self, cancelled=lambda: False):
+        if self.settings is None or not self.settings.enabled:
+            raise PermissionError('Polling must be enabled to refresh holidays')
+        if self.client is None:
+            self.client = self.client_factory(self.settings)
+        try:
+            health = Result()
+            identity = self.client._ensure_health(health, cancelled)
+            if identity != LIVE_ID and not health.simulator:
+                raise ValueError('Holiday refresh requires verified KO2B or simulator identity')
+            return self.client.read_holiday(cancelled)
+        except (OSError, ValueError, UnicodeError):
+            self.client.disconnect()
+            raise
+
     def write_holiday(self, departure, returning, cancelled=lambda: False, *, clear=False):
         if self.settings is None or not self.settings.enabled:
             raise PermissionError('Polling must be enabled to set holidays')

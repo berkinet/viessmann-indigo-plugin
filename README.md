@@ -54,7 +54,7 @@ Dedicated Clear holiday dates action writes both 1970-01-01 reset dates and conf
 
 ## Version 0.2.22
 
-The optional holiday control-page date variables follow confirmed heater date changes and successful Set/Clear readback. Unchanged polls preserve edits. External date changes replace edits with reported dates. Clear was live-tested successfully by the owner.
+The optional holiday control-page date variables follow confirmed heater date changes and successful Set/Clear readback. Unchanged polls preserve edits. External date changes refresh clean fields; unsent edits are preserved (since 0.2.41). Clear was live-tested successfully by the owner.
 
 ## Version 0.2.23
 
@@ -156,3 +156,7 @@ Optional control-page draft variables now have matching notes: Press Set to appl
 ## Version 0.2.41 — holiday draft highlighting
 
 Holiday draft dates now use the same optional pending-edit reminder as setpoints: Press Apply Holiday Dates, Update pending, then blank after matching valid readback. Apply/Clear submissions are serialized without retrying uncertain writes. Routine polls and external date changes preserve unsent edits, and a newer edit made during a write is retained. The local page removes the temperature arrows and retains the popup entry and Set buttons.
+
+## Version 0.2.42 — explicitly reload holiday dates
+
+The system action **Update holiday dates from heater** reads departure, return and holiday status through the shared communications manager, without enabling writes. The control page's **UPDATE FROM HEATER** button calls this action. A successful refresh replaces the existing drafts with the heater's dates; edits made after the refresh starts are preserved. Failed reads retain the dates and report failure. Repeated clicks while a holiday operation is pending do not queue duplicate work. Existing periodic holiday polling remains unchanged.

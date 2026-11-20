@@ -18,6 +18,10 @@
       </Field>
     </ConfigUI>
   </Action>
+  <Action id="refreshHoliday" deviceFilter="self.viessmannSystem">
+    <Name>Update holiday dates from heater</Name>
+    <CallbackMethod>refreshHoliday</CallbackMethod>
+  </Action>
   <Action id="setHoliday" deviceFilter="self.viessmannSystem">
     <Name>Set holiday departure and return dates</Name>
     <CallbackMethod>setHoliday</CallbackMethod>

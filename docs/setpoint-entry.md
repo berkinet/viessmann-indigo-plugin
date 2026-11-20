@@ -17,3 +17,7 @@ Holiday highlighting is a follow-up requested only after this setpoint trial is 
 Owner approved the trial, requested removal of the temperature arrows and asked for the same holiday behavior. The page now retains only the editable temperature entries and Set buttons. Both holiday date backgrounds and one reminder are bound to `vitoHolidayEditNote`; the image family includes the yellow exact-value state `Press Apply Holiday Dates`, plus `Update pending` and the white empty state.
 
 Holiday Apply/Clear share one pending-input lock. The reminder clears only on matching valid controller dates. Failed updates retain the draft/reminder; regular polling and external date changes do not overwrite a dirty draft. Edits made while an earlier operation is executing survive its readback. A shared pair highlight intentionally marks both date fields when either is unapplied.
+
+## Explicit holiday refresh — 0.2.42
+
+UPDATE FROM HEATER calls system action `refreshHoliday` for system device 192174802. It uses the shared worker and connection, checks controller identity and reads getHolidayStart, getHolidayEnd and getProbeHolidayActiveRaw. No setter is sent. The action deliberately replaces drafts present when clicked, including unapplied edits; edits made while the read is executing survive. Failure retains draft and actual dates, marks holidayValid false and reports holidayError/holidayActionStatus. The action shares the pending-operation lock with Apply/Clear. Routine full polls already read holidays, but intentionally preserve dirty drafts.
